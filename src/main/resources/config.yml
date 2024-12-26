@@ -1,0 +1,11 @@
+# Main server resource pack URL
+# This pack is loaded when using /load without arguments
+server-pack: "https://example.com/server-pack.zip"
+
+# Additional resource packs
+# These packs can be loaded using /load <packname>
+# To add a new pack, use a key:"value" format
+resource-packs:
+  example: "https://example.com/dungeons-pack.zip"
+  example0: "https://example.com/example0.zip"
+  example1: "https://example.com/example0.zip"

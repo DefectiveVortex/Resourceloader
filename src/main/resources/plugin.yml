@@ -1,0 +1,39 @@
+name: Resourceloader
+version: '1.0'
+main: org.vortex.resourceloader.Resourceloader
+api-version: '1.13'
+description: A simple and flexible resource pack loader for Minecraft servers
+author: DefectiveVortex
+website: https://github.com/DefectiveVortex/Resourceloader
+
+commands:
+  load:
+    description: Load a resource pack
+    usage: |
+      §e/load §7- Load the default server pack
+      §e/load <packname> §7- Load a specific pack
+    permission: resourceloader.load
+    aliases: [loadpack]
+
+  listpacks:
+    description: List all available resource packs
+    usage: /listpacks
+    permission: resourceloader.list
+    aliases: [packs, packlist]
+
+  resourcereload:
+    description: Reload the Resourceloader configuration
+    usage: /resourcereload
+    permission: resourceloader.reload
+    aliases: [rlresource]
+
+permissions:
+  resourceloader.load:
+    description: Allows loading resource packs
+    default: true
+  resourceloader.list:
+    description: Allows listing available resource packs
+    default: true
+  resourceloader.reload:
+    description: Allows reloading the plugin configuration
+    default: op
