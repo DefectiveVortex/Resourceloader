@@ -4,6 +4,12 @@
 # For files: "server-pack.zip"
 server-pack: "server-pack.zip"
 
+# Web server settings
+server-port: 40021  # Default port, can be changed to any open port on your host
+localhost: false    # Set to false for production servers, true only for local testing
+server-address: ""  # Will try to auto-detect if empty
+fallback-address: "localhost"  # Used if auto-detection fails
+
 # Additional resource packs
 # Can use either URLs or files from the packs folder
 resource-packs:

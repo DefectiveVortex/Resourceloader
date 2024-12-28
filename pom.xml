@@ -6,7 +6,7 @@
 
     <groupId>org.vortex</groupId>
     <artifactId>Resourceloader</artifactId>
-    <version>1.0</version>
+    <version>1.1</version>
     <packaging>jar</packaging>
 
     <name>Resourceloader</name>
@@ -39,6 +39,14 @@
                         <goals>
                             <goal>shade</goal>
                         </goals>
+                        <configuration>
+                            <relocations>
+                                <relocation>
+                                    <pattern>org.json.simple</pattern>
+                                    <shadedPattern>org.vortex.resourceloader.libs.json.simple</shadedPattern>
+                                </relocation>
+                            </relocations>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
@@ -64,6 +72,11 @@
             <artifactId>spigot-api</artifactId>
             <version>1.21.1-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.googlecode.json-simple</groupId>
+            <artifactId>json-simple</artifactId>
+            <version>1.1.1</version>
         </dependency>
     </dependencies>
 </project>

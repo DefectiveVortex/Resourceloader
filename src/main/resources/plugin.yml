@@ -30,6 +30,10 @@ commands:
     description: Set your preferred resource pack for automatic loading
     usage: /autoload [packname|clear]
     permission: resourceloader.autoload
+  resourceversion:
+    description: Check the current version and look for updates
+    usage: /resourceversion [check]
+    aliases: [ rv, resourcev ]
 
 permissions:
   resourceloader.load:
@@ -44,3 +48,15 @@ permissions:
   resourceloader.autoload:
     description: Allows setting resource pack for automatic loading
     default: true
+  resourceloader.version:
+    description: Allows checking the plugin version
+    default: op
+  resourceloader.admin:
+    description: Receives update notifications
+    default: op
+  resourceloader.pack.*:
+    description: Allows access to all resource packs
+    default: op
+  resourceloader.pack.<packname>:
+    description: Allows access to a specific resource pack
+    default: op
