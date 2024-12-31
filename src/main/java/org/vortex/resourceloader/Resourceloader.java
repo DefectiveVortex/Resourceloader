@@ -33,6 +33,13 @@ public final class Resourceloader extends JavaPlugin {
         packServer = new ResourcePackServer(this);
         packServer.start();
 
+        VersionChecker versionChecker = new VersionChecker(this);
+        getServer().getPluginManager().registerEvents(versionChecker, this);
+        getCommand("resourceversion").setExecutor(versionChecker.new VersionCommand());
+        // Register merge command
+        MergeCommand mergeCommand = new MergeCommand(this);
+        getCommand("mergepack").setExecutor(mergeCommand);
+        getCommand("mergepack").setTabCompleter(mergeCommand);
         // Register commands
         LoadCommand loadCommand = new LoadCommand(this);
         getCommand("load").setExecutor(loadCommand);
@@ -58,7 +65,7 @@ public final class Resourceloader extends JavaPlugin {
         }
     }
 
-    private void loadResourcePacks() {
+    public void loadResourcePacks() {
         resourcePacks.clear();
 
         // Load default server pack
@@ -240,7 +247,7 @@ public final class Resourceloader extends JavaPlugin {
 
         @Override
         public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-            if (!sender.hasPermission("resourceloader.reload")) {
+            if (!sender.hasPermission("resourceloader.admin")) {
                 sender.sendMessage(ChatColor.RED + "You do not have permission to reload the ResourceLoader plugin.");
                 return true;
             }

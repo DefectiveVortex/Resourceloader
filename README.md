@@ -1,111 +1,90 @@
 # Resourceloader
 
-**Resourceloader** is a simple, flexible plugin for Minecraft servers that allows for seamless management of resource packs without requiring players to endure the default server resource pack loading process. The plugin supports multiple resource packs, enabling players to load specific packs on demand via commands.
+A simple and flexible resource pack loader and merger plugin for Minecraft servers. Load different resource packs and merge multiple packs into one with ResourceLoader!
 
-## Key Features
+## Features
 
-- **Simplified Resource Pack Loading:** Avoid the default server-side resource pack loading experience, which can be confusing or annoying for new players.
-- **Dynamic Resource Pack Selection:** Load specific resource packs as needed using commands.
-- **Customizable Configurations:** Define and manage multiple resource packs via the `config.yml` file.
+- Load the server's default resource pack with a simple command
+- Configure and load multiple additional resource packs
+- Merge multiple resource packs in the plugin itself
+- Support for both URL and file-based resource packs
+- Easy-to-use commands
+- Permission-based access control
+- Simple configuration
 
 ## Commands
 
-### `/load [packname]`
-- **Description:** Loads a resource pack for the player.
-- **Usage:**
-    - `/load` - Loads the default server pack.
-    - `/load <packname>` - Loads a specific resource pack by name.
-- **Permission:** `resourceloader.load`
-
-### `/listpacks`
-- **Description:** Lists all available resource packs.
-- **Usage:** `/listpacks`
-- **Permission:** `resourceloader.list`
-
-### `/resourcereload`
-- **Description:** Reloads the plugin configuration.
-- **Usage:** `/resourcereload`
-- **Permission:** `resourceloader.reload`
+- `/load` - Load the default server resource pack
+- `/load <packname>` - Load a specific resource pack
+- `/mergepack <output-file>.zip <pack1> <pack2> [pack3...]` - Merge existing resource packs in the plugin itself
+- `/listpacks` - List all available resource packs
+- `/resourcereload` - Reload the plugin configuration
+- `/resourceversion` - Check the version of ResourceLoader you're running
 
 ## Permissions
 
-- **`resourceloader.load`**
-    - Allows players to load resource packs.
-    - Default: `true`
-- **`resourceloader.list`**
-    - Allows players to list available resource packs.
-    - Default: `true`
-- **`resourceloader.reload`**
-    - Allows operators to reload the plugin configuration.
-    - Default: `op`
-
-## Configuration (`config.yml`)
+- `resourceloader.load` - Allows using the /load command (default: true)
+- `resourceloader.list` - Allows using the /listpacks command (default: true)
+- `resourceloader.reload` - Allows reloading the plugin configuration (default: op)
+- `resourceloader.admin` - Allows access to all the admin commands of ResourceLoader (default: op)
+- 
+## Configuration
 
 ```yaml
-# Main server resource pack URL
-# This pack is loaded when using /load without arguments
-server-pack: "https://example.com/server-pack.zip"
+# Main server resource pack
+# Can be either a URL or a file name in the packs folder
+# For URLs: "https://example.com/server-pack.zip"
+# For files: "server-pack.zip"
+server-pack: "server-pack.zip"
+
+# Web server settings
+server-port: 40021  # Default port, can be changed to any open port on your host
+localhost: false    # Set to false for production servers, true only for local testing
+server-address: ""  # Will try to auto-detect if empty
+fallback-address: "localhost"  # Used if auto-detection fails
 
 # Additional resource packs
-# These packs can be loaded using /load <packname>
-# To add a new pack, use a key:"value" format
+# Can use either URLs or files from the packs folder
+# For URLs: "https://example.com/examplepack.zip"
+# For files: "example-pack.zip"
 resource-packs:
-  example: "https://example.com/dungeons-pack.zip"
-  example0: "https://example.com/example0.zip"
-  example1: "https://example.com/example1.zip"
+  exampleurlpack: "https://example.com/examplepack.zip"
+  examplefilepack: "example-pack.zip"
 ```
-
-### Adding New Resource Packs
-1. Open `config.yml`.
-2. Add a new entry under `resource-packs` in the format `key: "URL"`.
-3. Save the file and run `/resourcereload` to apply the changes.
-
-## How It Works
-
-1. Players can use `/load` to load the default resource pack or a specific pack by name.
-2. Use `/listpacks` to see all available resource packs.
-3. Administrators can reload the plugin configuration using `/resourcereload`.
-
-## Example
-
-- **Loading Default Pack:**
-  ```
-  /load
-  ```
-
-- **Loading a Specific Pack:**
-  ```
-  /load example
-  ```
-
-- **Listing Available Packs:**
-  ```
-  /listpacks
-  ```
-
-- **Reloading Configuration:**
-  ```
-  /resourcereload
-  ```
 
 ## Installation
 
-1. Download the plugin JAR file.
-2. Place it in the `plugins` folder of your Minecraft server.
-3. Start the server to generate the default configuration file.
-4. Customize `config.yml` as needed.
-5. Use `/resourcereload` to apply your changes.
+1. Download the latest release
+2. Place the JAR file in your server's `plugins` folder
+3. Start/restart your server
+4. A `packs` folder will be created in `plugins/Resourceloader/`
+5. Place your resource pack files in the `packs` folder
+6. Configure the packs in `config.yml`
+7. Use `/resourcereload` to apply changes
+
+## File-based Resource Packs
+
+To use file-based resource packs:
+1. Place your .zip resource pack files in the `plugins/Resourceloader/packs/` folder
+2. In config.yml, use just the filename (e.g., "my-pack.zip") instead of a full URL
+3. The plugin will automatically look for the file in the packs folder
+
+## URL-based Resource Packs
+
+For URL-based packs:
+1. Use the complete URL in config.yml (e.g., "https://example.com/pack.zip")
+2. Ensure the URL is directly downloadable
+3. The URL must point to a valid Minecraft resource pack .zip file
 
 ## Requirements
 
-- Minecraft Server Version: `1.13` or higher
-- Java Version: `17` or higher
+- Minecraft 1.13 or newer
+- Spigot/Paper server
 
-## Credits
+## Support
 
-**Author:** DefectiveVortex  
-**Website:** [GitHub Repository](https://github.com/DefectiveVortex/Resourceloader)
+If you encounter any issues or have suggestions, please create an issue on the GitHub repository.
 
----
+## License
 
-Feel free to contribute or suggest improvements via the [GitHub repository](https://github.com/DefectiveVortex/Resourceloader).
+This project is licensed under the MIT License - see the LICENSE file for details.

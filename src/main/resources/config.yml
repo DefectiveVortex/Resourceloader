@@ -12,7 +12,8 @@ fallback-address: "localhost"  # Used if auto-detection fails
 
 # Additional resource packs
 # Can use either URLs or files from the packs folder
+# For URLs: "https://example.com/examplepack.zip"
+# For files: "example-pack.zip"
 resource-packs:
-  dungeons: "dungeons-pack.zip"
-  pvp: "https://example.com/pvp-pack.zip"
-  holiday: "holiday-pack.zip"
+  exampleurlpack: "https://example.com/examplepack.zip"
+  examplefilepack: "example-pack.zip"

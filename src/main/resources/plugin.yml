@@ -1,5 +1,5 @@
 name: Resourceloader
-version: '1.1'
+version: '1.3'
 main: org.vortex.resourceloader.Resourceloader
 api-version: '1.13'
 description: A simple and flexible resource pack loader for Minecraft servers
@@ -14,25 +14,29 @@ commands:
       §e/load <packname> §7- Load a specific pack
     permission: resourceloader.load
     aliases: [loadpack]
-
+  mergepack:
+    description: Merge multiple resource packs into one
+    usage: /<command> <output_name> <pack1> <pack2> [pack3...]
+    permission: resourceloader.admin
+    aliases: [merge]
   listpacks:
     description: List all available resource packs
-    usage: /listpacks
+    usage: §e/listpacks
     permission: resourceloader.list
     aliases: [packs, packlist]
 
   resourcereload:
     description: Reload the Resourceloader configuration
-    usage: /resourcereload
-    permission: resourceloader.reload
+    usage: §a/resourcereload
+    permission: resourceloader.admin
     aliases: [rlresource]
   autoload:
     description: Set your preferred resource pack for automatic loading
-    usage: /autoload [packname|clear]
+    usage: §a/autoload [packname|clear]
     permission: resourceloader.autoload
   resourceversion:
     description: Check the current version and look for updates
-    usage: /resourceversion [check]
+    usage: §e/resourceversion
     aliases: [ rv, resourcev ]
 
 permissions:
@@ -42,21 +46,9 @@ permissions:
   resourceloader.list:
     description: Allows listing available resource packs
     default: true
-  resourceloader.reload:
-    description: Allows reloading the plugin configuration
-    default: op
   resourceloader.autoload:
     description: Allows setting resource pack for automatic loading
     default: true
-  resourceloader.version:
-    description: Allows checking the plugin version
-    default: op
   resourceloader.admin:
-    description: Receives update notifications
-    default: op
-  resourceloader.pack.*:
-    description: Allows access to all resource packs
-    default: op
-  resourceloader.pack.<packname>:
-    description: Allows access to a specific resource pack
+    description: Allows access to all admin access commands of Resourceloader
     default: op

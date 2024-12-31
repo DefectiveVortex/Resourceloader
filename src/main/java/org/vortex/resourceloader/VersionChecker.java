@@ -19,8 +19,8 @@ import java.util.concurrent.CompletableFuture;
 
 public class VersionChecker implements Listener {
     private final Resourceloader plugin;
-    private String latestVersion = null;
-    private boolean isUpdateAvailable = false;
+    private volatile String latestVersion = null;
+    private volatile boolean isUpdateAvailable = false;
 
     public VersionChecker(Resourceloader plugin) {
         this.plugin = plugin;
@@ -81,42 +81,35 @@ public class VersionChecker implements Listener {
     public class VersionCommand implements CommandExecutor {
         @Override
         public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-            if (!sender.hasPermission("resourceloader.version")) {
+            if (!sender.hasPermission("resourceloader.admin")) {
                 sender.sendMessage(ChatColor.RED + "You don't have permission to check the version.");
                 return true;
             }
 
             String currentVersion = plugin.getDescription().getVersion();
+            sender.sendMessage(ChatColor.YELLOW + "Checking for updates...");
 
-            if (args.length > 0 && args[0].equalsIgnoreCase("check")) {
-                sender.sendMessage(ChatColor.YELLOW + "Checking for updates...");
+            CompletableFuture.runAsync(() -> {
+                checkForUpdates();
 
-                CompletableFuture.runAsync(() -> {
-                    checkForUpdates();
+                plugin.getServer().getScheduler().runTask(plugin, () -> {
+                    if (latestVersion == null) {
+                        sender.sendMessage(ChatColor.RED + "Failed to check for updates.");
+                        return;
+                    }
 
-                    plugin.getServer().getScheduler().runTask(plugin, () -> {
-                        if (latestVersion == null) {
-                            sender.sendMessage(ChatColor.RED + "Failed to check for updates.");
-                            return;
-                        }
+                    sender.sendMessage(ChatColor.YELLOW + "Current version: " + ChatColor.WHITE + currentVersion);
+                    sender.sendMessage(ChatColor.YELLOW + "Latest version: " + ChatColor.WHITE + latestVersion);
 
-                        sender.sendMessage(ChatColor.YELLOW + "Current version: " + ChatColor.WHITE + currentVersion);
-                        sender.sendMessage(ChatColor.YELLOW + "Latest version: " + ChatColor.WHITE + latestVersion);
-
-                        if (isUpdateAvailable) {
-                            sender.sendMessage(ChatColor.GREEN + "A new version is available!");
-                            sender.sendMessage(ChatColor.YELLOW + "Download it from: " + ChatColor.WHITE +
-                                    "https://github.com/YOUR_USERNAME/Resourceloader/releases/latest");
-                        } else {
-                            sender.sendMessage(ChatColor.GREEN + "You are running the latest version!");
-                        }
-                    });
+                    if (isUpdateAvailable) {
+                        sender.sendMessage(ChatColor.GREEN + "A new version is available!");
+                        sender.sendMessage(ChatColor.YELLOW + "Download it from: " + ChatColor.WHITE +
+                                "https://github.com/DefectiveVortex/Resourceloader/releases/latest");
+                    } else {
+                        sender.sendMessage(ChatColor.GREEN + "You are running the latest version!");
+                    }
                 });
-            } else {
-                sender.sendMessage(ChatColor.YELLOW + "Resourceloader v" + currentVersion);
-                sender.sendMessage(ChatColor.YELLOW + "Use " + ChatColor.WHITE +
-                        "/resourceversion check" + ChatColor.YELLOW + " to check for updates.");
-            }
+            });
 
             return true;
         }
