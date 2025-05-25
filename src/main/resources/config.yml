@@ -1,0 +1,80 @@
+# ResourceLoader Configuration
+# For detailed documentation, visit: https://github.com/DefectiveVortex/Resourceloader
+
+#====================#
+# Basic Settings     #
+#====================#
+
+# The default server resource pack
+# Examples:
+#   For local file: "server-pack.zip"
+#   For URL: "https://example.com/server-pack.zip"
+server-pack: server-pack.zip
+
+#====================#
+# Enforcement        #
+#====================#
+
+# Resource pack enforcement settings
+enforcement:
+  enabled: false      # Should players be required to accept resource packs?
+  action: kick        # What to do when a player declines (kick, restrict)
+  decline-message: "You must accept the resource pack to play on this server!"
+  failed-action: kick # What to do when download fails (kick, restrict)
+  failed-message: "Failed to download the resource pack. Please try joining again!"
+
+#====================#
+# Server Settings    #
+#====================#
+
+# Web server configuration for serving resource packs
+server:
+  port: 40021          # The port to serve resource packs on
+  localhost: false     # Set to true only for local testing
+  address: ""          # Leave empty for auto-detection
+  fallback: localhost  # Used if auto-detection fails
+
+#====================#
+# Performance        #
+#====================#
+
+# Resource pack compression
+compression:
+  enabled: true
+  auto-select: true    # Automatically choose compression based on player's connection
+  default: medium    # Used when auto-select is false (options: low, medium, high)
+
+# Caching settings
+cache:
+  enabled: true
+  days: 7            # How long to keep cached packs
+  auto-cleanup: true # Remove old cache entries automatically
+
+#====================#
+# Backup & Stats     #
+#====================#
+
+# Automatic backup settings
+backup:
+  enabled: true
+  interval: 24      # Hours between backups
+  keep: 5          # Number of backups to keep
+
+# Usage statistics
+statistics:
+  enabled: true    # Track pack usage and performance
+  save-preferences: true  # Remember player's last used packs
+  max-history: 5   # Number of packs to remember per player
+
+#====================#
+# Interface          #
+#====================#
+
+# GUI settings for the pack merger
+gui:
+  enabled: true
+  preview: true    # Show pack preview before merging
+  conflicts: ask   # How to handle conflicts (ask, overwrite, skip)
+
+# Resource pack definitions
+resource-packs:
