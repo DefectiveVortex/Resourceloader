@@ -170,7 +170,6 @@ resource-packs:
 If you encounter any issues or have suggestions:
 - Create an issue on the GitHub repository
 - Contact @vortexunwanted on Discord (faster response)
-- Check the wiki for detailed documentation
 
 ## License
 
