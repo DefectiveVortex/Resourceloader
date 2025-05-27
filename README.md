@@ -162,8 +162,7 @@ resource-packs:
 
 ## Requirements
 
-- Minecraft 1.20 or newer
-- Paper server recommended
+- Minecraft 1.13 or newer
 - Java 17 or newer
 
 ## Support
