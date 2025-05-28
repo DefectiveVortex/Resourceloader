@@ -1,0 +1,87 @@
+name: Resourceloader
+version: '${project.version}'
+main: org.vortex.resourceloader.Resourceloader
+api-version: '1.13'
+authors: DefectiveVortex
+description: A plugin for managing and merging Minecraft resource packs
+website: https://github.com/DefectiveVortex/Resourceloader
+
+commands:
+  load:
+    description: Load a resource pack
+    usage: /load [pack]
+    aliases: [resourceload]
+    permission: resourceloader.load
+  
+  packlist:
+    description: List available resource packs
+    usage: /packlist
+    aliases: [listpacks, resourcepacks]
+    permission: resourceloader.list
+  
+  mergepack:
+    description: Merge multiple resource packs
+    usage: /mergepack <output> <pack1> [pack2...]
+    aliases: [merge]
+    permission: resourceloader.admin
+  
+  mergegui:
+    description: Open the resource pack merge GUI
+    usage: /mergegui
+    aliases: [guimerge]
+    permission: resourceloader.admin
+  
+  removepack:
+    description: Remove a resource pack
+    usage: /removepack <pack>
+    aliases: [resourceremove]
+    permission: resourceloader.admin
+
+  resourcereload:
+    description: Reload the plugin configuration
+    usage: /resourcereload
+    aliases: [rreload]
+    permission: resourceloader.admin
+  
+  clearcache:
+    description: Clear the resource pack cache
+    usage: /clearcache
+    aliases: [cacheclear]
+    permission: resourceloader.admin
+  
+  resourceversion:
+    description: Check plugin version
+    usage: /resourceversion
+    aliases: [rversion]
+    permission: resourceloader.admin
+  
+  autoload:
+    description: Set your preferred resource pack
+    usage: /autoload <pack|clear>
+    permission: resourceloader.autoload
+  
+  resourcehelp:
+    description: Show plugin help
+    usage: /resourcehelp
+    aliases: [rhelp]
+
+permissions:
+  resourceloader.load:
+    description: Allows loading resource packs
+    default: true
+  resourceloader.list:
+    description: Allows listing available resource packs
+    default: true
+  resourceloader.autoload:
+    description: Allows setting resource pack for automatic loading
+    default: true
+  resourceloader.admin:
+    description: Allows access to all admin commands
+    default: op
+    children:
+      resourceloader.load: true
+      resourceloader.list: true
+      resourceloader.autoload: true
+  resourceloader.bypass:
+    description: Allows bypassing resource pack enforcement
+    default: op

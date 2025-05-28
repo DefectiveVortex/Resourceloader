@@ -1,0 +1,107 @@
+# ResourceLoader Configuration
+# For detailed documentation, visit: https://github.com/DefectiveVortex/Resourceloader
+
+#====================#
+# Resource Packs     #
+#====================#
+
+# The default server resource pack that will be loaded when using /load without arguments
+# Examples:
+#   Local file: "server-pack.zip"
+#   URL: "https://example.com/server-pack.zip"
+server-pack: ""
+
+# Individual resource pack definitions
+# Format:
+#   packname: "filename.zip"    # For local files
+#   packname: "https://..."    # For external URLs
+resource-packs:
+  # example1: "pack1.zip"
+  # example2: "https://example.com/pack2.zip"
+
+# Storage configuration
+storage:
+  # Custom directory for resource packs (absolute path)
+  # Leave empty to use plugins/ResourceLoader/packs/
+  resource-pack-directory: ""
+  
+  # Automatic resource pack detection
+  auto-detection: true
+
+#====================#
+# Server Settings    #
+#====================#
+
+# Web server configuration for serving resource packs
+server:
+  # The port to serve resource packs on (default: 40021)
+  port: 40021
+  
+  # Network settings (advanced)
+  localhost: false     # Set to true only for local testing
+  address: ""         # Leave empty for auto-detection
+  fallback: localhost # Used if auto-detection fails
+
+#====================#
+# Performance       #
+#====================#
+
+# Resource pack compression settings
+compression:
+  # Enable compression of resource packs
+  enabled: true
+  
+  # Compression level selection
+  auto-select: true              # Choose compression based on player's connection
+  default-level: "medium"        # Used when auto-select is false
+                                # Options: "low", "medium", "high"
+
+# Cache settings for downloaded resource packs
+cache:
+  enabled: true
+  expiry-days: 7      # How long to keep cached packs
+  auto-cleanup: true  # Automatically remove expired cache entries
+
+#====================#
+# Pack Management   #
+#====================#
+
+# Backup configuration
+backup:
+  enabled: true
+  interval-hours: 24  # Hours between automatic backups
+  keep-count: 5       # Number of backup files to retain
+
+# Usage statistics and player preferences
+statistics:
+  enabled: true                # Track pack usage and performance
+  save-preferences: true       # Remember player's last used packs
+  max-preferences: 5           # Number of packs to remember per player
+
+#====================#
+# User Interface    #
+#====================#
+
+# GUI settings for the pack merger
+gui:
+  enabled: true
+  show-preview: true          # Show pack preview before merging
+  conflict-handling: "ask"    # How to handle conflicts: "ask", "overwrite", "skip"
+
+#====================#
+# Enforcement       #
+#====================#
+
+# Resource pack enforcement settings
+enforcement:
+  enabled: false
+  kick-on-decline: true
+  kick-on-fail: true
+  restrict:
+    prevent-interaction: true
+  # Whether to use vanilla Minecraft's resource pack system by modifying server.properties
+  # WARNING: This will override any existing resource pack settings in server.properties
+  use-server-properties: false
+  # If true, will create a public URL for the pack that doesn't require authentication
+  # Only used when use-server-properties is true and a local file is used
+  make-pack-public: false

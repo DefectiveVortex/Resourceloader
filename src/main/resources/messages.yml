@@ -1,0 +1,104 @@
+# ResourceLoader Messages Configuration
+# Use & for color codes (e.g., &a for green, &c for red)
+# Use %player% for player name
+# Use %pack% for resource pack name
+# Use %size% for file sizes
+# Use %current% and %total% for progress numbers
+
+prefix: "&7[&eResourceLoader&7] &r"
+
+general:
+  no-permission: "&cYou don't have permission to use this command."
+  reload-success: "&aConfiguration reloaded successfully!"
+  reload-failed: "&cFailed to reload configuration: %error%"
+  invalid-pack: "&cResource pack '%pack%' not found!"
+  players-only: "&cThis command can only be used by players."
+
+help:
+  header: "&6=== ResourceLoader Help ==="
+  load: "&e/load [pack] &7- Load a resource pack"
+  load-specific: "&e/load <pack> &7- Load a specific resource pack"
+  list: "&e/packlist &7- List available resource packs"
+  admin-header: "&6=== Admin Commands ==="
+  merge: "&e/mergepack <output> <pack1> <pack2> &7- Merge resource packs"
+  remove: "&e/removepack <pack> &7- Remove a resource pack"
+  reload: "&e/resourcereload &7- Reload configuration"
+  version: "&e/resourceversion &7- Check plugin version"
+  cache: "&e/clearcache &7- Clear resource pack cache"
+  footer: "&6=========================="
+
+resource-packs:
+  loading: "&eLoading resource pack %pack%..."
+  load-success: "&aResource pack loaded successfully!"
+  load-failed: "&cFailed to load resource pack: %error%"
+  download-started: "&eDownloading resource pack..."
+  download-success: "&aResource pack downloaded, applying..."
+  download-failed: "&cFailed to download resource pack. Please try again."
+  invalid-url: "&cInvalid resource pack URL. Please contact an administrator."
+  already-loading: "&cAlready loading a resource pack, please wait..."
+  no-default: "&cNo default resource pack configured."
+  not-found: "&cResource pack '%pack%' not found."
+  file-not-found: "&cResource pack file not found."
+  invalid-path: "&cInvalid path for resource pack '%pack%'."
+
+list:
+  header: "&6=== Available Resource Packs ==="
+  no-packs: "&7No resource packs available."
+  default-pack: "&7Default Pack: &f%type%"
+  pack-entry: "&7• &f%pack%"
+  footer: "&6==========================="
+
+autoload:
+  no-preference: "&eYou don't have a preferred resource pack set."
+  current-preference: "&eYour current preferred pack is: &6%pack%"
+  set: "&aSet &6%pack% &aas your preferred resource pack."
+  set-failed: "&cFailed to apply resource pack &6%pack%&c: %error%"
+  cleared: "&aCleared your resource pack preferences."
+  loaded: "&aAutomatically loaded your preferred pack: &6%pack%"
+
+merge:
+  started: "&7Starting to merge resource packs..."
+  progress: "&7Merging pack &e%current%&7/&e%total%"
+  success: "&aSuccessfully merged resource packs into: &e%pack%"
+  failed: "&cFailed to merge resource packs: %error%"
+  already-merging: "&cA merge operation is already in progress. Please wait."
+  invalid-usage: "&cUsage: /mergepack <output_name> <pack1> <pack2> [pack3...]"
+  no-packs: "&cYou must specify at least two packs to merge!"
+  invalid-pack: "&cResource pack '%pack%' not found!"
+  output-exists: "&cA resource pack with name '%pack%' already exists!"
+
+cache:
+  cleared: "&aResource pack cache has been cleared!"
+  using-cached: "&7Using cached version of %pack%"
+  downloading-new: "&7Downloading new version of %pack%"
+
+updates:
+  available: "&eA new version is available! Current: &c%current%&e, Latest: &a%latest%"
+  check-command: "&eUse &f/resourceversion check &efor more information."
+  checking: "&eChecking for updates..."
+  current-version: "&eCurrent version: &f%version%"
+  latest-version: "&eLatest version: &f%version%"
+  up-to-date: "&aYou are running the latest version!"
+  check-failed: "&cFailed to check for updates."
+
+gui:
+  title: "Resource Pack Merger"
+  preview-title: "Pack Preview: %pack%"
+  select-packs: "&eSelect packs to merge"
+  conflict-detected: "&eConflict detected in: %file%"
+  resolve-prompt: "&eHow would you like to resolve this conflict?"
+  loading-preview: "&ePreparing preview..."
+
+backup:
+  created: "&aCreated backup: %file%"
+  failed: "&cFailed to create backup: %error%"
+  cleaned: "&7Cleaned up old backup: %file%"
+
+statistics:
+  recorded: "&7Recorded usage of pack: %pack%"
+  preference-saved: "&7Saved pack preference for %player%"
+
+enforcement:
+  declined: "&cYou must accept the resource pack to play on this server!"
+  failed: "&cFailed to download the resource pack. Please try joining again!"
+  retry: "&eRetrying resource pack download in %seconds% seconds..." 
