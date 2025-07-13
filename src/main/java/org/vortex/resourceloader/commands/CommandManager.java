@@ -56,39 +56,40 @@ public class CommandManager {
     }
 
     private static class HelpCommand implements CommandExecutor {
-        private final Resourceloader plugin;
 
         public HelpCommand(Resourceloader plugin) {
-            this.plugin = plugin;
+            // Constructor for consistency
         }
 
         @Override
         public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-            sender.sendMessage(plugin.getMessageManager().getMessage("help.header"));
+            sender.sendMessage("§6=== ResourceLoader Help ===");
             
             if (sender.hasPermission("resourceloader.load")) {
-                sender.sendMessage(plugin.getMessageManager().getMessageNoPrefix("help.load"));
-                sender.sendMessage(plugin.getMessageManager().getMessageNoPrefix("help.load-specific"));
+                sender.sendMessage("§e/load [pack] §7- Load a resource pack");
+                sender.sendMessage("§e/load <pack> §7- Load a specific resource pack");
             }
             
             if (sender.hasPermission("resourceloader.list")) {
-                sender.sendMessage(plugin.getMessageManager().getMessageNoPrefix("help.list"));
+                sender.sendMessage("§e/listpacks §7- List available resource packs");
             }
 
             if (sender.hasPermission("resourceloader.autoload")) {
-                sender.sendMessage(plugin.getMessageManager().getMessageNoPrefix("help.autoload"));
+                sender.sendMessage("§e/autoload <pack|clear> §7- Set automatic pack loading");
             }
 
             if (sender.hasPermission("resourceloader.admin")) {
-                sender.sendMessage(plugin.getMessageManager().getMessageNoPrefix("help.admin-header"));
-                sender.sendMessage(plugin.getMessageManager().getMessageNoPrefix("help.merge"));
-                sender.sendMessage(plugin.getMessageManager().getMessageNoPrefix("help.remove"));
-                sender.sendMessage(plugin.getMessageManager().getMessageNoPrefix("help.reload"));
-                sender.sendMessage(plugin.getMessageManager().getMessageNoPrefix("help.version"));
-                sender.sendMessage(plugin.getMessageManager().getMessageNoPrefix("help.cache"));
+                sender.sendMessage("§6=== Admin Commands ===");
+                sender.sendMessage("§e/mergepack <output> <pack1> <pack2> §7- Merge resource packs");
+                sender.sendMessage("§e/mergegui §7- Open merge GUI");
+                sender.sendMessage("§e/removepack <pack> §7- Remove a resource pack");
+                sender.sendMessage("§e/checkpack <pack> §7- Validate a resource pack");
+                sender.sendMessage("§e/resourcereload §7- Reload configuration");
+                sender.sendMessage("§e/resourceversion §7- Check plugin version");
+                sender.sendMessage("§e/clearcache §7- Clear resource pack cache");
             }
 
-            sender.sendMessage(plugin.getMessageManager().getMessageNoPrefix("help.footer"));
+            sender.sendMessage("§6==========================");
             return true;
         }
     }
@@ -197,9 +198,72 @@ public class CommandManager {
                 return true;
             }
 
-            String version = plugin.getDescription().getVersion();
-            sender.sendMessage(plugin.getMessageManager().formatMessage("version.current", 
-                "version", version));
+            String currentVersion = plugin.getDescription().getVersion();
+            sender.sendMessage("§eChecking for updates...");
+
+            // Use async task to check for updates
+            plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+                try {
+                    java.net.URL url = java.net.URI.create("https://api.github.com/repos/DefectiveVortex/Resourceloader/releases/latest").toURL();
+                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+                    conn.setRequestMethod("GET");
+                    conn.setRequestProperty("Accept", "application/vnd.github.v3+json");
+                    conn.setConnectTimeout(5000);
+                    conn.setReadTimeout(5000);
+
+                    if (conn.getResponseCode() == java.net.HttpURLConnection.HTTP_OK) {
+                        java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(conn.getInputStream()));
+                        StringBuilder response = new StringBuilder();
+                        String line;
+
+                        while ((line = reader.readLine()) != null) {
+                            response.append(line);
+                        }
+                        reader.close();
+
+                        // Parse JSON response
+                        String jsonResponse = response.toString();
+                        String latestVersion = null;
+                        
+                        // Simple JSON parsing to extract tag_name
+                        int tagStart = jsonResponse.indexOf("\"tag_name\":\"") + 12;
+                        if (tagStart > 11) {
+                            int tagEnd = jsonResponse.indexOf("\"", tagStart);
+                            if (tagEnd > tagStart) {
+                                latestVersion = jsonResponse.substring(tagStart, tagEnd).replace("v", "");
+                            }
+                        }
+
+                        final String finalLatestVersion = latestVersion;
+                        plugin.getServer().getScheduler().runTask(plugin, () -> {
+                            if (finalLatestVersion != null) {
+                                sender.sendMessage("§eCurrent version: §f" + currentVersion);
+                                sender.sendMessage("§eLatest version: §f" + finalLatestVersion);
+
+                                if (!currentVersion.equals(finalLatestVersion)) {
+                                    sender.sendMessage("§aA new version is available!");
+                                    sender.sendMessage("§eDownload it from: §fhttps://github.com/DefectiveVortex/Resourceloader/releases/latest");
+                                } else {
+                                    sender.sendMessage("§aYou are running the latest version!");
+                                }
+                            } else {
+                                sender.sendMessage("§cFailed to parse version information.");
+                            }
+                        });
+                    } else {
+                        final int responseCode = conn.getResponseCode();
+                        plugin.getServer().getScheduler().runTask(plugin, () -> {
+                            sender.sendMessage("§cFailed to check for updates. HTTP " + responseCode);
+                        });
+                    }
+                } catch (Exception e) {
+                    plugin.getServer().getScheduler().runTask(plugin, () -> {
+                        sender.sendMessage("§cFailed to check for updates: " + e.getMessage());
+                        sender.sendMessage("§eCurrent version: §f" + currentVersion);
+                    });
+                }
+            });
+
             return true;
         }
     }

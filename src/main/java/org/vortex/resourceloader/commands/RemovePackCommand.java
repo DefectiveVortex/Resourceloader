@@ -27,14 +27,13 @@ public class RemovePackCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length != 1) {
-            sender.sendMessage(plugin.getMessageManager().getMessage("general.invalid-usage"));
+            sender.sendMessage("§cUsage: /removepack <packname>");
             return true;
         }
 
         String packName = args[0];
         if (!plugin.getResourcePacks().containsKey(packName)) {
-            sender.sendMessage(plugin.getMessageManager().formatMessage("general.invalid-pack", 
-                "pack", packName));
+            sender.sendMessage("§cResource pack '" + packName + "' not found!");
             return true;
         }
 
@@ -42,13 +41,11 @@ public class RemovePackCommand implements CommandExecutor, TabCompleter {
         if (packFile != null && packFile.exists()) {
             try {
                 if (!packFile.delete()) {
-                    sender.sendMessage(plugin.getMessageManager().formatMessage("general.pack-remove-failed", 
-                        "pack", packName));
+                    sender.sendMessage("§cFailed to remove resource pack '" + packName + "'!");
                     return true;
                 }
             } catch (SecurityException e) {
-                sender.sendMessage(plugin.getMessageManager().formatMessage("general.pack-remove-failed", 
-                    "pack", packName));
+                sender.sendMessage("§cFailed to remove resource pack '" + packName + "'!");
                 plugin.getLogger().warning("Failed to delete pack file: " + e.getMessage());
                 return true;
             }
@@ -61,8 +58,7 @@ public class RemovePackCommand implements CommandExecutor, TabCompleter {
         // Remove from memory
         plugin.getResourcePacks().remove(packName);
         
-        sender.sendMessage(plugin.getMessageManager().formatMessage("general.pack-removed", 
-            "pack", packName));
+        sender.sendMessage("§aSuccessfully removed resource pack '" + packName + "'!");
         return true;
     }
 
