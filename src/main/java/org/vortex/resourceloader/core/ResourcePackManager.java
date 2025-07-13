@@ -16,6 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 public class ResourcePackManager {
@@ -225,4 +226,122 @@ public class ResourcePackManager {
         packWatcher.shutdown();
         savePreferences();
     }
-} 
+
+    private String sanitizePackName(String packName) {
+        // Remove file extension if present
+        if (packName.toLowerCase().endsWith(".zip")) {
+            packName = packName.substring(0, packName.length() - 4);
+        }
+        
+        // First, convert to lowercase for consistency
+        packName = packName.toLowerCase();
+        
+        // Replace spaces, periods and special characters with underscores
+        packName = packName.replaceAll("[\\s.]+", "_");
+        
+        // Remove any other non-alphanumeric characters except underscores
+        packName = packName.replaceAll("[^a-z0-9_]", "");
+        
+        // Remove multiple consecutive underscores
+        packName = packName.replaceAll("_+", "_");
+        
+        // Remove leading and trailing underscores
+        packName = packName.replaceAll("^_+|_+$", "");
+        
+        // If name is empty after sanitization, use a default
+        if (packName.isEmpty()) {
+            packName = "resource_pack";
+        }
+        
+        return packName;
+    }
+
+    public void handleNewResourcePack(File packFile) {
+        if (!packFile.getName().toLowerCase().endsWith(".zip")) {
+            return;
+        }
+
+        // Reload config to avoid wiping unrelated sections
+        plugin.reloadConfig();
+
+        String originalName = packFile.getName();
+        String sanitizedName = sanitizePackName(originalName);
+        File packDirectory = getResourcePackDirectory();
+        File newFile = new File(packDirectory, sanitizedName + ".zip");
+
+        try {
+            // Check if the file is already in the correct format
+            if (packFile.getName().equals(sanitizedName + ".zip") && packFile.getParentFile().equals(packDirectory)) {
+                newFile = packFile;
+            } else {
+                // Find a unique name if needed
+                int counter = 1;
+                while (newFile.exists()) {
+                    String nextName = sanitizedName + "_" + counter;
+                    if (!isPackNameInConfig(nextName)) {
+                        newFile = new File(packDirectory, nextName + ".zip");
+                        break;
+                    }
+                    counter++;
+                }
+                Files.move(packFile.toPath(), newFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            }
+
+            // Get or create the resource-packs section
+            ConfigurationSection packs = plugin.getConfig().getConfigurationSection("resource-packs");
+            if (packs == null) {
+                packs = plugin.getConfig().createSection("resource-packs");
+            }
+
+            // Remove any old entry for the original file name
+            String oldKey = null;
+            for (String key : packs.getKeys(false)) {
+                String value = packs.getString(key);
+                if (value != null && value.equals(originalName)) {
+                    oldKey = key;
+                    break;
+                }
+            }
+            if (oldKey != null) {
+                packs.set(oldKey, null);
+                resourcePacks.remove(oldKey);
+            }
+
+            // Generate a unique key for the config
+            String configKey = getUniqueConfigKey(sanitizedName, packs);
+            packs.set(configKey, newFile.getName());
+            resourcePacks.put(configKey, newFile);
+
+            plugin.saveConfig();
+            logger.info("Added new resource pack: " + configKey + " (file: " + newFile.getName() + ")");
+        } catch (IOException e) {
+            logger.warning("Failed to process new resource pack " + packFile.getName() + ": " + e.getMessage());
+        }
+    }
+
+    private boolean isPackNameInConfig(String name) {
+        ConfigurationSection packs = plugin.getConfig().getConfigurationSection("resource-packs");
+        if (packs == null) {
+            return false;
+        }
+        for (String key : packs.getKeys(false)) {
+            String packPath = packs.getString(key);
+            if (packPath != null && packPath.equals(name + ".zip")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String getUniqueConfigKey(String baseName, ConfigurationSection packs) {
+        String key = baseName;
+        int counter = 1;
+        
+        while (packs.contains(key)) {
+            key = baseName + "_" + counter;
+            counter++;
+        }
+        
+        return key;
+    }
+}

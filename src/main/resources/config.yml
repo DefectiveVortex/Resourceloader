@@ -92,7 +92,8 @@ gui:
 # Enforcement       #
 #====================#
 
-# Resource pack enforcement settings
+# Resource pack enforcement settings 
+# (Bypassed by default for server operators through 'resourceloader.bypass')
 enforcement:
   enabled: false
   kick-on-decline: true

@@ -33,6 +33,11 @@ public class CommandManager {
         // Register admin commands
         plugin.getCommand("removepack").setExecutor(new RemovePackCommand(plugin));
         plugin.getCommand("removepack").setTabCompleter(new RemovePackCommand(plugin));
+        
+        CheckPackCommand checkPackCmd = new CheckPackCommand(plugin);
+        plugin.getCommand("checkpack").setExecutor(checkPackCmd);
+        plugin.getCommand("checkpack").setTabCompleter(checkPackCmd);
+        
         plugin.getCommand("resourcereload").setExecutor(new ReloadCommand(plugin));
         plugin.getCommand("clearcache").setExecutor(new ClearCacheCommand(plugin));
         plugin.getCommand("resourceversion").setExecutor(new VersionCommand(plugin));

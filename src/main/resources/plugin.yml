@@ -2,7 +2,7 @@ name: Resourceloader
 version: '${project.version}'
 main: org.vortex.resourceloader.Resourceloader
 api-version: '1.13'
-authors: DefectiveVortex
+author: DefectiveVortex
 description: A plugin for managing and merging Minecraft resource packs
 website: https://github.com/DefectiveVortex/Resourceloader
 
@@ -35,6 +35,12 @@ commands:
     description: Remove a resource pack
     usage: /removepack <pack>
     aliases: [resourceremove]
+    permission: resourceloader.admin
+
+  checkpack:
+    description: Validate a resource pack structure and content
+    usage: /checkpack <pack>
+    aliases: [validatepack, packcheck]
     permission: resourceloader.admin
 
   resourcereload:

@@ -84,16 +84,23 @@ public class ResourcePackServer {
 
     private void serveResourcePack(com.sun.net.httpserver.HttpExchange exchange, String packPath) throws IOException {
         File packFile = new File(plugin.getDataFolder(), "packs/" + packPath);
+        
+        if (!packFile.exists()) {
+            packFile = new File(plugin.getDataFolder(), "cache/" + packPath);
+        }
+
         if (!packFile.exists()) {
             exchange.sendResponseHeaders(404, -1);
             return;
         }
 
         exchange.getResponseHeaders().set("Content-Type", "application/zip");
+        exchange.getResponseHeaders().set("Cache-Control", "public, max-age=31536000");
         exchange.sendResponseHeaders(200, packFile.length());
 
         try (OutputStream os = exchange.getResponseBody()) {
             Files.copy(packFile.toPath(), os);
+            plugin.getLogger().info("Successfully served resource pack: " + packPath);
         }
     }
 
@@ -105,18 +112,16 @@ public class ResourcePackServer {
     }
 
     public String createDownloadURL(Player player, String packName, String packPath) {
+        String host = plugin.getConfig().getString("server-host", "localhost");
+        int port = plugin.getConfig().getInt("server-port", 40021);
+        
         if (plugin.getConfig().getBoolean("enforcement.use-server-properties", false) &&
             plugin.getConfig().getBoolean("enforcement.make-pack-public", false)) {
-            String host = plugin.getConfig().getString("server-host", "localhost");
-            int port = plugin.getConfig().getInt("server-port", 40021);
             return String.format("http://%s:%d/public/%s", host, port, packPath);
         }
 
-        // Default to secure URL with token
         String token = UUID.randomUUID().toString();
         playerTokens.put(player.getUniqueId(), token);
-        String host = plugin.getConfig().getString("server-host", "localhost");
-        int port = plugin.getConfig().getInt("server-port", 40021);
         return String.format("http://%s:%d/download/%s?token=%s", host, port, packPath, token);
     }
-} 
+}
