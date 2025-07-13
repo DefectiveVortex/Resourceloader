@@ -6,19 +6,14 @@ import org.vortex.resourceloader.Resourceloader;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
-import java.util.logging.Logger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 public class PackValidator {
-    private final Resourceloader plugin;
-    private final Logger logger;
     private final ObjectMapper mapper;
     private final List<ValidationIssue> issues;
 
     public PackValidator(Resourceloader plugin) {
-        this.plugin = plugin;
-        this.logger = plugin.getLogger();
         this.mapper = new ObjectMapper();
         this.issues = new ArrayList<>();
     }
