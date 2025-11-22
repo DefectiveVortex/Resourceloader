@@ -28,9 +28,12 @@ public class ResourcePackServer {
 
     public void start() {
         try {
-            int port = plugin.getConfig().getInt("server-port", 40021);
+            int port = plugin.getConfig().getInt("server.port", 40021);
+            // Bind to 0.0.0.0 by default to allow external connections, or use specific
+            // bind address if needed
+            // For now, we bind to wildcard to ensure it's accessible
             server = HttpServer.create(new InetSocketAddress(port), 0);
-            
+
             // Secure endpoint for authenticated downloads
             server.createContext("/download", exchange -> {
                 String query = exchange.getRequestURI().getQuery();
@@ -76,7 +79,15 @@ public class ResourcePackServer {
 
             server.setExecutor(null);
             server.start();
+
+            String publicAddress = plugin.getConfig().getString("server.address", "");
+            if (publicAddress.isEmpty()) {
+                publicAddress = plugin.getConfig().getString("server.fallback", "localhost");
+            }
+
             logger.info("Resource pack server started on port " + port);
+            logger.info("Public URL base: http://" + publicAddress + ":" + port);
+
         } catch (IOException e) {
             logger.severe("Failed to start resource pack server: " + e.getMessage());
         }
@@ -84,23 +95,31 @@ public class ResourcePackServer {
 
     private void serveResourcePack(com.sun.net.httpserver.HttpExchange exchange, String packPath) throws IOException {
         File packFile = new File(plugin.getDataFolder(), "packs/" + packPath);
-        
+
         if (!packFile.exists()) {
             packFile = new File(plugin.getDataFolder(), "cache/" + packPath);
         }
 
         if (!packFile.exists()) {
+            logger.warning("Requested resource pack not found: " + packPath);
             exchange.sendResponseHeaders(404, -1);
             return;
         }
 
-        exchange.getResponseHeaders().set("Content-Type", "application/zip");
-        exchange.getResponseHeaders().set("Cache-Control", "public, max-age=31536000");
-        exchange.sendResponseHeaders(200, packFile.length());
+        try {
+            exchange.getResponseHeaders().set("Content-Type", "application/zip");
+            exchange.getResponseHeaders().set("Cache-Control", "public, max-age=31536000");
+            exchange.sendResponseHeaders(200, packFile.length());
 
-        try (OutputStream os = exchange.getResponseBody()) {
-            Files.copy(packFile.toPath(), os);
-            plugin.getLogger().info("Successfully served resource pack: " + packPath);
+            try (OutputStream os = exchange.getResponseBody()) {
+                Files.copy(packFile.toPath(), os);
+            }
+            // Only log on debug or success if needed, but avoid spamming for every chunk
+            plugin.getLogger()
+                    .info("Successfully served resource pack: " + packPath + " (" + packFile.length() + " bytes)");
+        } catch (IOException e) {
+            logger.warning("Failed to serve resource pack " + packPath + ": " + e.getMessage());
+            throw e; // Re-throw to let the server handle the connection close
         }
     }
 
@@ -112,11 +131,15 @@ public class ResourcePackServer {
     }
 
     public String createDownloadURL(Player player, String packName, String packPath) {
-        String host = plugin.getConfig().getString("server-host", "localhost");
-        int port = plugin.getConfig().getInt("server-port", 40021);
-        
+        String host = plugin.getConfig().getString("server.address", "");
+        if (host.isEmpty()) {
+            host = plugin.getConfig().getString("server.fallback", "localhost");
+        }
+
+        int port = plugin.getConfig().getInt("server.port", 40021);
+
         if (plugin.getConfig().getBoolean("enforcement.use-server-properties", false) &&
-            plugin.getConfig().getBoolean("enforcement.make-pack-public", false)) {
+                plugin.getConfig().getBoolean("enforcement.make-pack-public", false)) {
             return String.format("http://%s:%d/public/%s", host, port, packPath);
         }
 

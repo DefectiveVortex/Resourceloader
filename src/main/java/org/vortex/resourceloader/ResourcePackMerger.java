@@ -3,6 +3,7 @@ package org.vortex.resourceloader;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.commons.io.FileUtils;
+import org.vortex.resourceloader.util.FileUtil;
 
 import java.io.*;
 import java.util.*;
@@ -73,8 +74,8 @@ public class ResourcePackMerger {
             // Check available space
             long availableSpace = workDir.getUsableSpace();
             if (availableSpace < requiredSpace) {
-                throw new IOException("Insufficient disk space. Required: " + (requiredSpace / 1024 / 1024) + 
-                                    "MB, Available: " + (availableSpace / 1024 / 1024) + "MB");
+                throw new IOException("Insufficient disk space. Required: " + (requiredSpace / 1024 / 1024) +
+                        "MB, Available: " + (availableSpace / 1024 / 1024) + "MB");
             }
 
             logger.info("Merging " + inputPacks.size() + " resource packs...");
@@ -102,7 +103,7 @@ public class ResourcePackMerger {
             for (int i = 0; i < extractedDirs.size(); i++) {
                 File sourceDir = extractedDirs.get(i);
                 mergeDirectory(sourceDir, outputDir, i == extractedDirs.size() - 1);
-                
+
                 // Cleanup extracted directory after merging to free space
                 if (i < extractedDirs.size() - 1) {
                     FileUtils.deleteDirectory(sourceDir);
@@ -110,14 +111,27 @@ public class ResourcePackMerger {
             }
 
             // Create output file
-            File outputFile = new File(plugin.getDataFolder(), "packs/" + outputName);
-            zipDirectory(outputDir, outputFile);
+            File tempOutputFile = new File(workDir, outputName + ".tmp");
+            zipDirectory(outputDir, tempOutputFile);
+
+            // Validate the generated zip file
+            try {
+                FileUtil.validateZipFile(tempOutputFile);
+            } catch (IOException e) {
+                throw new IOException("Generated merged pack is invalid: " + e.getMessage(), e);
+            }
 
             // Update pack.mcmeta with latest format
             updatePackMeta(outputDir);
 
+            // Move to final location atomically
+            File finalOutputFile = new File(plugin.getDataFolder(), "packs/" + outputName);
+            finalOutputFile.getParentFile().mkdirs();
+
+            Files.move(tempOutputFile.toPath(), finalOutputFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+
             logger.info("Resource packs merged successfully!");
-            return outputFile;
+            return finalOutputFile;
 
         } catch (Exception e) {
             throw new IOException("Failed to merge resource packs: " + e.getMessage(), e);
@@ -145,7 +159,7 @@ public class ResourcePackMerger {
 
                 entryFile.getParentFile().mkdirs();
                 try (InputStream in = zipFile.getInputStream(entry);
-                     OutputStream out = new FileOutputStream(entryFile)) {
+                        OutputStream out = new FileOutputStream(entryFile)) {
                     byte[] buffer = new byte[BUFFER_SIZE];
                     int read;
                     while ((read = in.read(buffer)) != -1) {
@@ -163,32 +177,33 @@ public class ResourcePackMerger {
         }
 
         Files.walk(sourceDir.toPath())
-            .filter(Files::isRegularFile)
-            .forEach(sourcePath -> {
-                try {
-                    Path relativePath = sourceDir.toPath().relativize(sourcePath);
-                    File targetFile = new File(targetDir, relativePath.toString());
-                    
-                    if (sourcePath.toString().endsWith(".json")) {
-                        mergeJsonFile(targetFile, sourcePath.toFile(), isLastPack);
-                    } else {
-                        // For non-JSON files, newer pack always takes priority
-                        if (isLastPack || !targetFile.exists()) {
-                            FileUtils.copyFile(sourcePath.toFile(), targetFile);
+                .filter(Files::isRegularFile)
+                .forEach(sourcePath -> {
+                    try {
+                        Path relativePath = sourceDir.toPath().relativize(sourcePath);
+                        File targetFile = new File(targetDir, relativePath.toString());
+
+                        if (sourcePath.toString().endsWith(".json")) {
+                            mergeJsonFile(targetFile, sourcePath.toFile(), isLastPack);
+                        } else {
+                            // For non-JSON files, newer pack always takes priority
+                            if (isLastPack || !targetFile.exists()) {
+                                FileUtils.copyFile(sourcePath.toFile(), targetFile);
+                            }
                         }
+                    } catch (IOException e) {
+                        logger.warning("Failed to merge file " + sourcePath + ": " + e.getMessage());
                     }
-                } catch (IOException e) {
-                    logger.warning("Failed to merge file " + sourcePath + ": " + e.getMessage());
-                }
-            });
+                });
     }
 
     private void mergeJsonFile(File targetFile, File sourceFile, boolean isLastPack) throws IOException {
         ObjectMapper mapper = new ObjectMapper();
-        
+
         // Read source file
         Map<String, Object> sourceMap = readJsonFile(sourceFile, mapper);
-        if (sourceMap == null) return;
+        if (sourceMap == null)
+            return;
 
         // If target doesn't exist or this is the last pack, just copy/overwrite
         if (!targetFile.exists() || isLastPack) {
@@ -237,7 +252,8 @@ public class ResourcePackMerger {
 
         // Merge textures
         if (source.containsKey("textures")) {
-            Map<String, Object> targetTextures = (Map<String, Object>) target.computeIfAbsent("textures", k -> new HashMap<>());
+            Map<String, Object> targetTextures = (Map<String, Object>) target.computeIfAbsent("textures",
+                    k -> new HashMap<>());
             targetTextures.putAll((Map<String, Object>) source.get("textures"));
         }
 
@@ -254,12 +270,13 @@ public class ResourcePackMerger {
 
         // Merge overrides with duplicate checking
         if (source.containsKey("overrides")) {
-            List<Map<String, Object>> targetOverrides = (List<Map<String, Object>>) target.computeIfAbsent("overrides", k -> new ArrayList<>());
+            List<Map<String, Object>> targetOverrides = (List<Map<String, Object>>) target.computeIfAbsent("overrides",
+                    k -> new ArrayList<>());
             List<Map<String, Object>> sourceOverrides = (List<Map<String, Object>>) source.get("overrides");
-            
+
             Set<String> existingPredicates = new HashSet<>();
             targetOverrides.forEach(override -> existingPredicates.add(override.toString()));
-            
+
             sourceOverrides.forEach(override -> {
                 if (!existingPredicates.contains(override.toString())) {
                     targetOverrides.add(override);
@@ -283,7 +300,8 @@ public class ResourcePackMerger {
 
     private Map<String, Object> readJsonFile(File file, ObjectMapper mapper) {
         try {
-            return mapper.readValue(file, new TypeReference<Map<String, Object>>() {});
+            return mapper.readValue(file, new TypeReference<Map<String, Object>>() {
+            });
         } catch (IOException e) {
             logger.warning("Failed to read JSON file " + file.getName() + ": " + e.getMessage());
             return null;
@@ -305,59 +323,63 @@ public class ResourcePackMerger {
     private void zipDirectory(File sourceDir, File zipFile) throws IOException {
         try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(zipFile))) {
             Files.walk(sourceDir.toPath())
-                .filter(path -> !Files.isDirectory(path))
-                .forEach(path -> {
-                    ZipEntry zipEntry = new ZipEntry(sourceDir.toPath().relativize(path).toString().replace('\\', '/'));
-                    try {
-                        zos.putNextEntry(zipEntry);
-                        Files.copy(path, zos);
-                        zos.closeEntry();
-                    } catch (IOException e) {
-                        logger.warning("Failed to add file to zip: " + path);
-                    }
-                });
+                    .filter(path -> !Files.isDirectory(path))
+                    .forEach(path -> {
+                        ZipEntry zipEntry = new ZipEntry(
+                                sourceDir.toPath().relativize(path).toString().replace('\\', '/'));
+                        try {
+                            zos.putNextEntry(zipEntry);
+                            Files.copy(path, zos);
+                            zos.closeEntry();
+                        } catch (IOException e) {
+                            logger.warning("Failed to add file to zip: " + path);
+                        }
+                    });
         }
     }
 
     private int getPackFormat() {
         String version = plugin.getServer().getBukkitVersion();
-        
+
         // Extract the main version number (e.g., "1.20.4-R0.1-SNAPSHOT" -> "1.20.4")
         version = version.split("-")[0];
-        
+
         // Map Minecraft versions to pack_format numbers
+        // See https://minecraft.wiki/w/Pack_format
         return switch (version) {
-            case "1.20.3", "1.20.4" -> 18;  // 1.20.3 - 1.20.4
-            case "1.20.2" -> 17;            // 1.20.2
-            case "1.20", "1.20.1" -> 15;    // 1.20 - 1.20.1
-            case "1.19.4" -> 13;            // 1.19.4
-            case "1.19.3" -> 12;            // 1.19.3
-            case "1.19.1", "1.19.2" -> 9;   // 1.19 - 1.19.2
-            case "1.18.2" -> 8;             // 1.18.2
-            case "1.18", "1.18.1" -> 7;     // 1.18 - 1.18.1
-            case "1.17", "1.17.1" -> 7;     // 1.17 - 1.17.1
-            case "1.16.2", "1.16.3", "1.16.4", "1.16.5" -> 6;  // 1.16.2 - 1.16.5
-            case "1.16", "1.16.1" -> 5;     // 1.16 - 1.16.1
-            case "1.15", "1.15.1", "1.15.2" -> 5;  // 1.15.x
-            case "1.14", "1.14.1", "1.14.2", "1.14.3", "1.14.4" -> 4;  // 1.14.x
-            case "1.13", "1.13.1", "1.13.2" -> 4;  // 1.13.x
-            case "1.21", "1.21.1", "1.21.2", "1.21.3", "1.21.4", "1.21.5", "1.21.6", "1.21.7" -> 22; // Future versions
+            case "1.21.2", "1.21.3" -> 42;
+            case "1.21", "1.21.1" -> 34;
+            case "1.20.5", "1.20.6" -> 32;
+            case "1.20.3", "1.20.4" -> 22;
+            case "1.20.2" -> 18;
+            case "1.20", "1.20.1" -> 15;
+            case "1.19.4" -> 13;
+            case "1.19.3" -> 12;
+            case "1.19.1", "1.19.2" -> 9;
+            case "1.18.2" -> 8;
+            case "1.18", "1.18.1" -> 7;
+            case "1.17", "1.17.1" -> 7;
+            case "1.16.2", "1.16.3", "1.16.4", "1.16.5" -> 6;
+            case "1.16", "1.16.1" -> 5;
+            case "1.15", "1.15.1", "1.15.2" -> 5;
+            case "1.14", "1.14.1", "1.14.2", "1.14.3", "1.14.4" -> 4;
+            case "1.13", "1.13.1", "1.13.2" -> 4;
             default -> {
                 // For unknown versions, try to make an educated guess
-                // This helps with future versions until we update the mapping
                 String[] parts = version.split("\\.");
                 if (parts.length >= 2) {
-                    int major = Integer.parseInt(parts[1]);
-                    if (major >= 21) { // Future versions
-                        yield 22;
-                    } else if (major >= 20) {
-                        yield 18;
-                    } else if (major >= 19) {
-                        yield 13;
+                    try {
+                        int major = Integer.parseInt(parts[1]);
+                        if (major >= 21) { // Future versions
+                            yield 34;
+                        } else if (major >= 20) {
+                            yield 15;
+                        }
+                    } catch (NumberFormatException ignored) {
                     }
                 }
                 // Default to latest known format if we can't determine version
-                yield 22;
+                yield 34;
             }
         };
     }
@@ -365,7 +387,7 @@ public class ResourcePackMerger {
     private void updatePackMeta(File packDir) throws IOException {
         File mcmetaFile = new File(packDir, "pack.mcmeta");
         ObjectMapper mapper = new ObjectMapper();
-        
+
         Map<String, Object> mcmeta;
         if (mcmetaFile.exists()) {
             mcmeta = readJsonFile(mcmetaFile, mapper);
@@ -386,14 +408,14 @@ public class ResourcePackMerger {
             pack = new HashMap<>();
             mcmeta.put("pack", pack);
         }
-        
+
         // Use the server's version to determine pack format
         int packFormat = getPackFormat();
         pack.put("pack_format", packFormat);
         pack.put("description", "Merged Resource Pack (Format: " + packFormat + ")");
 
-        logger.info("Setting merged pack format to " + packFormat + " for server version " + 
-            plugin.getServer().getBukkitVersion());
+        logger.info("Setting merged pack format to " + packFormat + " for server version " +
+                plugin.getServer().getBukkitVersion());
 
         writeJsonFile(mcmetaFile, mcmeta, mapper);
     }

@@ -1,7 +1,7 @@
 name: Resourceloader
 version: '${project.version}'
 main: org.vortex.resourceloader.Resourceloader
-api-version: '1.13'
+api-version: '1.21'
 author: DefectiveVortex
 description: A plugin for managing and merging Minecraft resource packs
 website: https://github.com/DefectiveVortex/Resourceloader
