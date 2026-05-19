@@ -9,6 +9,8 @@ import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.net.InetAddress;
+import java.net.URLEncoder;
 
 public class EarlyPackLoader {
     private final Resourceloader plugin;
@@ -23,7 +25,7 @@ public class EarlyPackLoader {
         this.plugin = plugin;
         this.serverPropertiesPath = plugin.getServer().getWorldContainer().toPath().resolve("server.properties");
         this.useServerProperties = plugin.getConfig().getBoolean("enforcement.use-server-properties", false);
-        
+
         if (useServerProperties) {
             loadOriginalSettings();
             updateServerProperties();
@@ -36,13 +38,13 @@ public class EarlyPackLoader {
             try (InputStream input = Files.newInputStream(serverPropertiesPath)) {
                 properties.load(input);
             }
-            
+
             // Store original values
             originalResourcePack = properties.getProperty("resource-pack", "");
             originalResourcePackSha1 = properties.getProperty("resource-pack-sha1", "");
             originalResourcePackPrompt = properties.getProperty("resource-pack-prompt", "");
             originalResourcePackRequired = Boolean.parseBoolean(properties.getProperty("require-resource-pack", "false"));
-            
+
         } catch (IOException e) {
             plugin.getLogger().warning("Failed to load server.properties: " + e.getMessage());
         }
@@ -75,7 +77,7 @@ public class EarlyPackLoader {
             if (serverPack.startsWith("http")) {
                 packUrl = serverPack;
             } else {
-                File packFile = new File(plugin.getDataFolder(), "packs/" + serverPack);
+                File packFile = new File(plugin.getPackManager().getResolvedResourcePackDirectory(), serverPack);
                 if (!packFile.exists()) {
                     plugin.getLogger().warning("Resource pack file not found: " + serverPack);
                     return;
@@ -83,17 +85,18 @@ public class EarlyPackLoader {
 
                 if (plugin.getConfig().getBoolean("enforcement.make-pack-public", false)) {
                     // Create a public URL without authentication
-                    String host = plugin.getConfig().getString("server-host", "localhost");
-                    int port = plugin.getConfig().getInt("server-port", 40021);
-                    packUrl = String.format("http://%s:%d/public/%s", host, port, serverPack);
-                    
+                    String host = resolvePublicHost();
+                    int port = plugin.getConfig().getInt("server.port", 40021);
+                    String encodedPackPath = URLEncoder.encode(serverPack, StandardCharsets.UTF_8).replace("+", "%20");
+                    packUrl = String.format("http://%s:%d/public/%s", host, port, encodedPackPath);
+
                     // We need to modify our ResourcePackServer to handle public URLs
                     plugin.getLogger().info("Using public URL for resource pack: " + packUrl);
                 } else {
                     plugin.getLogger().warning("Cannot use local file with server.properties unless make-pack-public is enabled");
                     return;
                 }
-                
+
                 // Calculate SHA1 for local files
                 try {
                     byte[] hash = FileUtil.calcSHA1(packFile);
@@ -110,9 +113,9 @@ public class EarlyPackLoader {
             if (!packSha1.isEmpty()) {
                 properties.setProperty("resource-pack-sha1", packSha1);
             }
-            properties.setProperty("require-resource-pack", 
-                String.valueOf(plugin.getConfig().getBoolean("enforce.kick-on-decline", true)));
-            
+            properties.setProperty("require-resource-pack",
+                String.valueOf(plugin.getConfig().getBoolean("enforcement.kick-on-decline", true)));
+
             // Save properties while preserving comments
             List<String> lines = new ArrayList<>();
             try (BufferedReader reader = Files.newBufferedReader(serverPropertiesPath)) {
@@ -131,9 +134,9 @@ public class EarlyPackLoader {
 
             // Write back the file
             Files.write(serverPropertiesPath, lines, StandardCharsets.UTF_8);
-            
+
             plugin.getLogger().info("Updated server.properties with resource pack settings");
-            
+
         } catch (IOException e) {
             plugin.getLogger().severe("Failed to update server.properties: " + e.getMessage());
         }
@@ -143,20 +146,20 @@ public class EarlyPackLoader {
         if (!useServerProperties) {
             return false;
         }
-        
+
         try {
             Properties properties = new Properties();
             try (InputStream input = Files.newInputStream(serverPropertiesPath)) {
                 properties.load(input);
             }
-            
+
             String currentPack = properties.getProperty("resource-pack", "");
             String serverPack = plugin.getConfig().getString("server-pack", "");
-            
-            return currentPack.contains(serverPack) || 
+
+            return currentPack.contains(serverPack) ||
                    (serverPack.startsWith("http") && currentPack.equals(serverPack)) ||
                    (!serverPack.startsWith("http") && currentPack.endsWith(serverPack));
-            
+
         } catch (IOException e) {
             return false;
         }
@@ -166,7 +169,7 @@ public class EarlyPackLoader {
         if (!useServerProperties) {
             return;
         }
-        
+
         try {
             List<String> lines = new ArrayList<>();
             try (BufferedReader reader = Files.newBufferedReader(serverPropertiesPath)) {
@@ -187,7 +190,7 @@ public class EarlyPackLoader {
 
             Files.write(serverPropertiesPath, lines, StandardCharsets.UTF_8);
             plugin.getLogger().info("Restored original resource pack settings in server.properties");
-            
+
         } catch (IOException e) {
             plugin.getLogger().severe("Failed to restore server.properties: " + e.getMessage());
         }
@@ -203,9 +206,35 @@ public class EarlyPackLoader {
         return hexString.toString();
     }
 
+    private String resolvePublicHost() {
+        String configured = plugin.getConfig().getString("server.address", "");
+        if (!configured.isBlank()) {
+            return configured;
+        }
+
+        if (plugin.getConfig().getBoolean("server.localhost", false)) {
+            return "localhost";
+        }
+
+        String serverIp = plugin.getServer().getIp();
+        if (serverIp != null && !serverIp.isBlank() && !"0.0.0.0".equals(serverIp)) {
+            return serverIp;
+        }
+
+        try {
+            String detected = InetAddress.getLocalHost().getHostAddress();
+            if (detected != null && !detected.isBlank()) {
+                return detected;
+            }
+        } catch (IOException ignored) {
+        }
+
+        return plugin.getConfig().getString("server.fallback", "localhost");
+    }
+
     public void cleanup() {
         if (useServerProperties && isOurResourcePack()) {
             restoreOriginalSettings();
         }
     }
-} 
+}

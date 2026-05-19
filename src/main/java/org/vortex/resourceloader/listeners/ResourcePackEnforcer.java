@@ -37,7 +37,7 @@ public class ResourcePackEnforcer implements Listener {
         this.pendingRetries = new ConcurrentHashMap<>();
         this.restrictedPlayers = ConcurrentHashMap.newKeySet();
         this.packLoading = new ConcurrentHashMap<>();
-        
+
         // Register additional events
         plugin.getServer().getPluginManager().registerEvents(new RestrictedModeHandler(), plugin);
     }
@@ -68,7 +68,7 @@ public class ResourcePackEnforcer implements Listener {
                 return;
             }
         }
-        
+
         plugin.getLogger().info("No autoload preference or enforcement configured for player " + player.getName());
     }
 
@@ -106,7 +106,7 @@ public class ResourcePackEnforcer implements Listener {
                             byte[] hash = FileUtil.calcSHA1(cachedFile);
                             String downloadUrl = plugin.getPackManager().getPackServer()
                                 .createDownloadURL(player, packName, cachedFile.getName());
-                            
+
                             plugin.getServer().getScheduler().runTask(plugin, () -> {
                                 if (player.isOnline()) {
                                     if (hash != null) {
@@ -127,13 +127,13 @@ public class ResourcePackEnforcer implements Listener {
                         return null;
                     });
             } else {
-                File packFile = new File(plugin.getDataFolder(), "packs/" + packPath);
+                File packFile = new File(plugin.getPackManager().getResolvedResourcePackDirectory(), packPath);
                 if (packFile.exists()) {
                     plugin.getLogger().info(logPrefix + ": Loading local pack file: " + packFile.getName());
                     String downloadUrl = plugin.getPackManager().getPackServer()
                         .createDownloadURL(player, packName, packPath);
                     byte[] hash = FileUtil.calcSHA1(packFile);
-                    
+
                     if (hash != null) {
                         player.setResourcePack(downloadUrl, hash);
                         plugin.getLogger().info(logPrefix + ": Successfully sent local pack '" + packName + "' to " + player.getName());
@@ -154,19 +154,19 @@ public class ResourcePackEnforcer implements Listener {
     @EventHandler(priority = EventPriority.HIGH)
     public void onResourcePackStatus(PlayerResourcePackStatusEvent event) {
         Player player = event.getPlayer();
-        
+
         if (player.hasPermission("resourceloader.bypass")) {
             return;
         }
 
         switch (event.getStatus()) {
             case DECLINED:
-                if (plugin.getConfig().getBoolean("enforce.kick-on-decline", true)) {
+                if (plugin.getConfig().getBoolean("enforcement.kick-on-decline", true)) {
                     player.kickPlayer(plugin.getMessageManager().getMessage("enforcement.declined"));
                 }
                 break;
             case FAILED_DOWNLOAD:
-                if (plugin.getConfig().getBoolean("enforce.kick-on-fail", true)) {
+                if (plugin.getConfig().getBoolean("enforcement.kick-on-fail", true)) {
                     player.kickPlayer(plugin.getMessageManager().getMessage("enforcement.failed"));
                 }
                 break;

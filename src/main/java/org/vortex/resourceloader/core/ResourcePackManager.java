@@ -38,7 +38,7 @@ public class ResourcePackManager {
         this.packWatcher = new ResourcePackWatcher(plugin, this);
         this.playerPreferences = new ConcurrentHashMap<>();
         this.preferencesFile = plugin.getDataFolder().toPath().resolve("preferences.yml");
-        
+
         loadPreferences();
         loadResourcePacks(true);
         packServer.start();
@@ -97,7 +97,7 @@ public class ResourcePackManager {
     public void loadResourcePacks(boolean silent) {
         resourcePacks.clear();
         File packDirectory = getResourcePackDirectory();
-        
+
         if (!packDirectory.exists()) {
             packDirectory.mkdirs();
         }
@@ -141,16 +141,16 @@ public class ResourcePackManager {
 
     public void loadResourcePack(Player player, String packName, String packPath) {
         if (packPath == null || packPath.isEmpty()) {
-            player.sendMessage(plugin.getMessageManager().formatMessage("resource-packs.invalid-pack", 
+            player.sendMessage(plugin.getMessageManager().formatMessage("resource-packs.invalid-pack",
                 "pack", packName));
             return;
         }
 
         try {
             if (packPath.startsWith("http://") || packPath.startsWith("https://")) {
-                player.sendMessage(plugin.getMessageManager().formatMessage("resource-packs.loading", 
+                player.sendMessage(plugin.getMessageManager().formatMessage("resource-packs.loading",
                     "pack", packName));
-                
+
                 packCache.getCachedPack(packPath, packName)
                     .thenAccept(cachedFile -> {
                         try {
@@ -159,13 +159,13 @@ public class ResourcePackManager {
                             player.setResourcePack(downloadUrl, fileHash);
                             player.sendMessage(plugin.getMessageManager().getMessage("resource-packs.load-success"));
                         } catch (Exception e) {
-                            player.sendMessage(plugin.getMessageManager().formatMessage("resource-packs.load-failed", 
+                            player.sendMessage(plugin.getMessageManager().formatMessage("resource-packs.load-failed",
                                 "error", e.getMessage()));
                             logger.warning("Failed to load cached pack: " + e.getMessage());
                         }
                     })
                     .exceptionally(e -> {
-                        player.sendMessage(plugin.getMessageManager().formatMessage("resource-packs.load-failed", 
+                        player.sendMessage(plugin.getMessageManager().formatMessage("resource-packs.load-failed",
                             "error", e.getMessage()));
                         logger.warning("Failed to load pack: " + e.getMessage());
                         return null;
@@ -185,13 +185,13 @@ public class ResourcePackManager {
                     player.setResourcePack(finalUrl);
                 }
 
-                player.sendMessage(plugin.getMessageManager().formatMessage("resource-packs.loading", 
+                player.sendMessage(plugin.getMessageManager().formatMessage("resource-packs.loading",
                     "pack", packName));
             }
 
             logger.info("Resource pack '" + packName + "' load attempted for player " + player.getName());
         } catch (Exception e) {
-            player.sendMessage(plugin.getMessageManager().formatMessage("resource-packs.load-failed", 
+            player.sendMessage(plugin.getMessageManager().formatMessage("resource-packs.load-failed",
                 "error", e.getMessage()));
             logger.warning("Resource pack loading failed: " + e.getMessage());
         }
@@ -207,6 +207,10 @@ public class ResourcePackManager {
             logger.warning("Failed to use custom resource pack directory: " + customPath);
         }
         return new File(plugin.getDataFolder(), "packs");
+    }
+
+    public File getResolvedResourcePackDirectory() {
+        return getResourcePackDirectory();
     }
 
     public Map<String, File> getResourcePacks() {
@@ -232,27 +236,27 @@ public class ResourcePackManager {
         if (packName.toLowerCase().endsWith(".zip")) {
             packName = packName.substring(0, packName.length() - 4);
         }
-        
+
         // First, convert to lowercase for consistency
         packName = packName.toLowerCase();
-        
+
         // Replace spaces, periods and special characters with underscores
         packName = packName.replaceAll("[\\s.]+", "_");
-        
+
         // Remove any other non-alphanumeric characters except underscores
         packName = packName.replaceAll("[^a-z0-9_]", "");
-        
+
         // Remove multiple consecutive underscores
         packName = packName.replaceAll("_+", "_");
-        
+
         // Remove leading and trailing underscores
         packName = packName.replaceAll("^_+|_+$", "");
-        
+
         // If name is empty after sanitization, use a default
         if (packName.isEmpty()) {
             packName = "resource_pack";
         }
-        
+
         return packName;
     }
 
@@ -336,12 +340,12 @@ public class ResourcePackManager {
     private String getUniqueConfigKey(String baseName, ConfigurationSection packs) {
         String key = baseName;
         int counter = 1;
-        
+
         while (packs.contains(key)) {
             key = baseName + "_" + counter;
             counter++;
         }
-        
+
         return key;
     }
 }

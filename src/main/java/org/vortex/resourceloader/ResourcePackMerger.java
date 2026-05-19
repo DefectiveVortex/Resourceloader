@@ -125,7 +125,7 @@ public class ResourcePackMerger {
             updatePackMeta(outputDir);
 
             // Move to final location atomically
-            File finalOutputFile = new File(plugin.getDataFolder(), "packs/" + outputName);
+            File finalOutputFile = new File(plugin.getPackManager().getResolvedResourcePackDirectory(), outputName);
             finalOutputFile.getParentFile().mkdirs();
 
             Files.move(tempOutputFile.toPath(), finalOutputFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
@@ -341,8 +341,26 @@ public class ResourcePackMerger {
     private int getPackFormat() {
         String version = plugin.getServer().getBukkitVersion();
 
-        // Extract the main version number (e.g., "1.20.4-R0.1-SNAPSHOT" -> "1.20.4")
-        version = version.split("-")[0];
+        // Use Regex to find the version number (e.g., 1.20.4) safely in any string
+        // Matches 1.20, 1.20.4, 1.20.4-rc1, etc.
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("(\\d+\\.\\d+(\\.\\d+)?)");
+        java.util.regex.Matcher matcher = pattern.matcher(version);
+
+        if (matcher.find()) {
+            version = matcher.group(1);
+        } else {
+            // Fallback: Try getVersion() which might be "git-Paper-123 (MC: 1.20.4)"
+            String serverVersion = plugin.getServer().getVersion();
+            matcher = pattern.matcher(serverVersion);
+            if (matcher.find()) {
+                version = matcher.group(1);
+            } else {
+                logger.warning("Could not determine server version from: '" + version + "' or '" + serverVersion
+                        + "'. Defaulting to 1.21 pack format.");
+                // Default to 1.21 logic if we fail completely
+                return 34;
+            }
+        }
 
         // Map Minecraft versions to pack_format numbers
         // See https://minecraft.wiki/w/Pack_format

@@ -43,9 +43,9 @@ public class MergeCommand implements CommandExecutor, TabCompleter {
         final String outputName = args[0].toLowerCase().endsWith(".zip") ? args[0] : args[0] + ".zip";
 
         // Check if output pack already exists
-        File outputFile = new File(plugin.getDataFolder(), "packs/" + outputName);
+        File outputFile = new File(plugin.getPackManager().getResolvedResourcePackDirectory(), outputName);
         if (outputFile.exists()) {
-            sender.sendMessage(plugin.getMessageManager().formatMessage("merge.output-exists", 
+            sender.sendMessage(plugin.getMessageManager().formatMessage("merge.output-exists",
                 "pack", outputName));
             return true;
         }
@@ -55,7 +55,7 @@ public class MergeCommand implements CommandExecutor, TabCompleter {
             String packName = args[i];
             File packFile = plugin.getResourcePacks().get(packName);
             if (packFile == null || !packFile.exists()) {
-                sender.sendMessage(plugin.getMessageManager().formatMessage("merge.invalid-pack", 
+                sender.sendMessage(plugin.getMessageManager().formatMessage("merge.invalid-pack",
                     "pack", packName));
                 return true;
             }
@@ -74,10 +74,10 @@ public class MergeCommand implements CommandExecutor, TabCompleter {
             try {
                 ResourcePackMerger merger = new ResourcePackMerger(plugin);
                 File result = merger.mergeResourcePacks(packsToMerge, outputName);
-                
+
                 plugin.getServer().getScheduler().runTask(plugin, () -> {
                     if (result != null && result.exists()) {
-                        sender.sendMessage(plugin.getMessageManager().formatMessage("merge.success", 
+                        sender.sendMessage(plugin.getMessageManager().formatMessage("merge.success",
                             "pack", outputName));
                         plugin.loadResourcePacks(true);
                     } else {
@@ -87,7 +87,7 @@ public class MergeCommand implements CommandExecutor, TabCompleter {
                 });
             } catch (Exception e) {
                 plugin.getServer().getScheduler().runTask(plugin, () -> {
-                    sender.sendMessage(plugin.getMessageManager().formatMessage("merge.failed", 
+                    sender.sendMessage(plugin.getMessageManager().formatMessage("merge.failed",
                         "error", e.getMessage()));
                     isMerging.set(false);
                 });
@@ -100,7 +100,7 @@ public class MergeCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         List<String> completions = new ArrayList<>();
-        
+
         if (!sender.hasPermission("resourceloader.admin")) {
             return completions;
         }
@@ -113,4 +113,4 @@ public class MergeCommand implements CommandExecutor, TabCompleter {
         Collections.sort(completions);
         return completions;
     }
-} 
+}

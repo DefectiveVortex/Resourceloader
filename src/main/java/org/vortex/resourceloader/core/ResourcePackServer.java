@@ -8,10 +8,14 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.InetAddress;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.HashMap;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
 public class ResourcePackServer {
@@ -23,7 +27,7 @@ public class ResourcePackServer {
     public ResourcePackServer(Resourceloader plugin) {
         this.plugin = plugin;
         this.logger = plugin.getLogger();
-        this.playerTokens = new HashMap<>();
+        this.playerTokens = new ConcurrentHashMap<>();
     }
 
     public void start() {
@@ -63,7 +67,12 @@ public class ResourcePackServer {
                     return;
                 }
 
-                serveResourcePack(exchange, packPath);
+                try {
+                    serveResourcePack(exchange, packPath);
+                } catch (SecurityException e) {
+                    logger.warning("Blocked potential path traversal attempt from " + exchange.getRemoteAddress());
+                    exchange.sendResponseHeaders(403, -1);
+                }
             });
 
             // Public endpoint for vanilla Minecraft client
@@ -74,16 +83,18 @@ public class ResourcePackServer {
                 }
 
                 String packPath = exchange.getRequestURI().getPath().substring("/public/".length());
-                serveResourcePack(exchange, packPath);
+                try {
+                    serveResourcePack(exchange, packPath);
+                } catch (SecurityException e) {
+                    logger.warning("Blocked potential path traversal attempt from " + exchange.getRemoteAddress());
+                    exchange.sendResponseHeaders(403, -1);
+                }
             });
 
-            server.setExecutor(null);
+            server.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(16));
             server.start();
 
-            String publicAddress = plugin.getConfig().getString("server.address", "");
-            if (publicAddress.isEmpty()) {
-                publicAddress = plugin.getConfig().getString("server.fallback", "localhost");
-            }
+            String publicAddress = resolvePublicHost();
 
             logger.info("Resource pack server started on port " + port);
             logger.info("Public URL base: http://" + publicAddress + ":" + port);
@@ -94,10 +105,21 @@ public class ResourcePackServer {
     }
 
     private void serveResourcePack(com.sun.net.httpserver.HttpExchange exchange, String packPath) throws IOException {
-        File packFile = new File(plugin.getDataFolder(), "packs/" + packPath);
+        File dataFolder = plugin.getDataFolder();
+        File packsDir = plugin.getPackManager().getResolvedResourcePackDirectory();
+        File cacheDir = new File(dataFolder, "cache");
+        Path packsRoot = packsDir.getCanonicalFile().toPath().normalize();
+        Path cacheRoot = cacheDir.getCanonicalFile().toPath().normalize();
+        File packFile = new File(packsDir, packPath);
 
         if (!packFile.exists()) {
-            packFile = new File(plugin.getDataFolder(), "cache/" + packPath);
+            packFile = new File(cacheDir, packPath);
+        }
+
+        Path canonicalPackPath = packFile.getCanonicalFile().toPath().normalize();
+
+        if (!canonicalPackPath.startsWith(packsRoot) && !canonicalPackPath.startsWith(cacheRoot)) {
+            throw new SecurityException("Path traversal attempt");
         }
 
         if (!packFile.exists()) {
@@ -131,20 +153,44 @@ public class ResourcePackServer {
     }
 
     public String createDownloadURL(Player player, String packName, String packPath) {
-        String host = plugin.getConfig().getString("server.address", "");
-        if (host.isEmpty()) {
-            host = plugin.getConfig().getString("server.fallback", "localhost");
-        }
+        String host = resolvePublicHost();
 
         int port = plugin.getConfig().getInt("server.port", 40021);
+        String encodedPath = URLEncoder.encode(packPath, StandardCharsets.UTF_8).replace("+", "%20");
 
         if (plugin.getConfig().getBoolean("enforcement.use-server-properties", false) &&
                 plugin.getConfig().getBoolean("enforcement.make-pack-public", false)) {
-            return String.format("http://%s:%d/public/%s", host, port, packPath);
+            return String.format("http://%s:%d/public/%s", host, port, encodedPath);
         }
 
         String token = UUID.randomUUID().toString();
         playerTokens.put(player.getUniqueId(), token);
-        return String.format("http://%s:%d/download/%s?token=%s", host, port, packPath, token);
+        return String.format("http://%s:%d/download/%s?token=%s", host, port, encodedPath, token);
+    }
+
+    private String resolvePublicHost() {
+        String configured = plugin.getConfig().getString("server.address", "");
+        if (!configured.isBlank()) {
+            return configured;
+        }
+
+        if (plugin.getConfig().getBoolean("server.localhost", false)) {
+            return "localhost";
+        }
+
+        String serverIp = plugin.getServer().getIp();
+        if (serverIp != null && !serverIp.isBlank() && !"0.0.0.0".equals(serverIp)) {
+            return serverIp;
+        }
+
+        try {
+            String detected = InetAddress.getLocalHost().getHostAddress();
+            if (detected != null && !detected.isBlank()) {
+                return detected;
+            }
+        } catch (IOException ignored) {
+        }
+
+        return plugin.getConfig().getString("server.fallback", "localhost");
     }
 }

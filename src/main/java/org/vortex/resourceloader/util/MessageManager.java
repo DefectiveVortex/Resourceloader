@@ -31,36 +31,23 @@ public class MessageManager {
     public void loadMessages() {
         try {
             messagesFile = plugin.getDataFolder().toPath().resolve(DEFAULT_MESSAGES_FILE);
-            
-            // Create messages file if it doesn't exist
-            if (!Files.exists(messagesFile)) {
-                Files.createDirectories(messagesFile.getParent());
-                plugin.saveResource(DEFAULT_MESSAGES_FILE, false);
-            }
 
-            // Load messages from file
-            messages = YamlConfiguration.loadConfiguration(messagesFile.toFile());
+            messages = ConfigFileUpdater.update(plugin, DEFAULT_MESSAGES_FILE, messagesFile.toFile());
             messageCache.clear();
 
-            // Load default messages for missing keys
+            // Keep defaults in memory as a fallback for unsaved or unreadable values
             try (InputStream defaultStream = plugin.getResource(DEFAULT_MESSAGES_FILE)) {
                 if (defaultStream != null) {
                     YamlConfiguration defaultMessages = YamlConfiguration.loadConfiguration(
                         new InputStreamReader(defaultStream, StandardCharsets.UTF_8)
                     );
                     messages.setDefaults(defaultMessages);
-                    messages.options().copyDefaults(true);
-                    
-                    // Save if defaults were copied
-                    if (messages.getDefaults() != null && !messages.getDefaults().getKeys(true).isEmpty()) {
-                        messages.save(messagesFile.toFile());
-                    }
                 }
             }
 
             // Load prefix with fallback
             prefix = formatMessage(messages.getString("prefix", DEFAULT_PREFIX));
-            
+
         } catch (IOException e) {
             plugin.getLogger().severe("Failed to load messages: " + e.getMessage());
             plugin.getLogger().severe("Using default messages only");
@@ -125,13 +112,13 @@ public class MessageManager {
 
         String message = getMessageNoPrefix(path);
         Map<String, String> placeholders = new HashMap<>();
-        
+
         for (int i = 0; i < args.length; i += 2) {
             if (args[i] != null && args[i + 1] != null) {
                 placeholders.put(args[i].toString(), args[i + 1].toString());
             }
         }
-        
+
         return prefix + formatMessage(message, placeholders);
     }
 
@@ -166,4 +153,4 @@ public class MessageManager {
             messages.save(messagesFile.toFile());
         }
     }
-} 
+}

@@ -4,6 +4,7 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.vortex.resourceloader.Resourceloader;
+import org.vortex.resourceloader.util.ConfigFileUpdater;
 
 
 public class CommandManager {
@@ -33,11 +34,11 @@ public class CommandManager {
         // Register admin commands
         plugin.getCommand("removepack").setExecutor(new RemovePackCommand(plugin));
         plugin.getCommand("removepack").setTabCompleter(new RemovePackCommand(plugin));
-        
+
         CheckPackCommand checkPackCmd = new CheckPackCommand(plugin);
         plugin.getCommand("checkpack").setExecutor(checkPackCmd);
         plugin.getCommand("checkpack").setTabCompleter(checkPackCmd);
-        
+
         plugin.getCommand("resourcereload").setExecutor(new ReloadCommand(plugin));
         plugin.getCommand("clearcache").setExecutor(new ClearCacheCommand(plugin));
         plugin.getCommand("resourceversion").setExecutor(new VersionCommand(plugin));
@@ -64,12 +65,12 @@ public class CommandManager {
         @Override
         public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
             sender.sendMessage("§6=== ResourceLoader Help ===");
-            
+
             if (sender.hasPermission("resourceloader.load")) {
                 sender.sendMessage("§e/load [pack] §7- Load a resource pack");
                 sender.sendMessage("§e/load <pack> §7- Load a specific resource pack");
             }
-            
+
             if (sender.hasPermission("resourceloader.list")) {
                 sender.sendMessage("§e/listpacks §7- List available resource packs");
             }
@@ -109,12 +110,13 @@ public class CommandManager {
             }
 
             try {
+                ConfigFileUpdater.updateBundledConfigs(plugin);
                 plugin.reloadConfig();
                 plugin.getMessageManager().reloadMessages();
                 plugin.loadResourcePacks(true);
                 sender.sendMessage(plugin.getMessageManager().getMessage("general.reload-success"));
             } catch (Exception e) {
-                sender.sendMessage(plugin.getMessageManager().formatMessage("general.reload-failed", 
+                sender.sendMessage(plugin.getMessageManager().formatMessage("general.reload-failed",
                     "error", e.getMessage()));
             }
 
@@ -167,7 +169,7 @@ public class CommandManager {
             String serverPack = plugin.getConfig().getString("server-pack");
             if (serverPack != null && !serverPack.isEmpty()) {
                 String packType = serverPack.startsWith("http") ? "URL" : "File";
-                sender.sendMessage(plugin.getMessageManager().formatMessage("list.default-pack", 
+                sender.sendMessage(plugin.getMessageManager().formatMessage("list.default-pack",
                     "type", packType));
             }
 
@@ -224,7 +226,7 @@ public class CommandManager {
                         // Parse JSON response
                         String jsonResponse = response.toString();
                         String latestVersion = null;
-                        
+
                         // Simple JSON parsing to extract tag_name
                         int tagStart = jsonResponse.indexOf("\"tag_name\":\"") + 12;
                         if (tagStart > 11) {
@@ -267,4 +269,4 @@ public class CommandManager {
             return true;
         }
     }
-} 
+}

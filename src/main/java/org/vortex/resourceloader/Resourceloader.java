@@ -1,22 +1,11 @@
 package org.vortex.resourceloader;
-
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
-import org.bukkit.command.CommandSender;
-import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.command.TabCompleter;
 import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
-import org.bukkit.util.StringUtil;
-import org.vortex.resourceloader.util.FileUtil;
-import java.util.Collections;
 import org.vortex.resourceloader.core.ResourcePackManager;
 import org.vortex.resourceloader.compression.PackCompressor;
 import org.vortex.resourceloader.gui.MergeGUI;
+import org.vortex.resourceloader.util.ConfigFileUpdater;
 import org.vortex.resourceloader.util.MessageManager;
 import org.vortex.resourceloader.commands.CommandManager;
 import org.vortex.resourceloader.listeners.ResourcePackEnforcer;
@@ -24,16 +13,10 @@ import org.vortex.resourceloader.listeners.EarlyPackLoader;
 import org.vortex.resourceloader.listeners.ResourcePackStatusListener;
 
 public final class Resourceloader extends JavaPlugin {
-    private final ResourcePackManager packManager;
-    private final PackCompressor packCompressor;
+    private ResourcePackManager packManager;
+    private PackCompressor packCompressor;
     private MergeGUI mergeGUI;
-    private final MessageManager messageManager;
-
-    public Resourceloader() {
-        this.messageManager = new MessageManager(this);
-        this.packManager = new ResourcePackManager(this);
-        this.packCompressor = new PackCompressor(this);
-    }
+    private MessageManager messageManager;
 
     @Override
     public void onEnable() {
@@ -42,8 +25,13 @@ public final class Resourceloader extends JavaPlugin {
             getDataFolder().mkdirs();
         }
 
-        // Save default config if it doesn't exist
-        saveDefaultConfig();
+        // Repair bundled config files before any manager reads them
+        ConfigFileUpdater.updateBundledConfigs(this);
+        reloadConfig();
+
+        messageManager = new MessageManager(this);
+        packManager = new ResourcePackManager(this);
+        packCompressor = new PackCompressor(this);
 
         // Register commands
         new CommandManager(this);

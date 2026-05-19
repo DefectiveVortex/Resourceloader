@@ -31,7 +31,7 @@ public class ResourcePackCache {
         this.cacheDir = plugin.getDataFolder().toPath().resolve("cache");
         this.etagCache = new HashMap<>();
         this.downloadBars = new HashMap<>();
-        
+
         try {
             Files.createDirectories(cacheDir);
             cleanOldCache();
@@ -62,7 +62,7 @@ public class ResourcePackCache {
             try {
                 String cachedEtag = etagCache.get(url);
                 Path cachePath = cacheDir.resolve(packName + "_" + getUrlHash(url) + ".zip");
-                
+
                 if (Files.exists(cachePath)) {
                     HttpURLConnection conn = (HttpURLConnection) URI.create(url).toURL().openConnection();
                     conn.setRequestMethod("HEAD");
@@ -98,19 +98,19 @@ public class ResourcePackCache {
     private void downloadPack(String url, Path destination, Player player) throws IOException {
         HttpURLConnection conn = null;
         BossBar progressBar = null;
-        
+
         try {
             conn = (HttpURLConnection) URI.create(url).toURL().openConnection();
             conn.setRequestMethod("GET");
-            conn.setRequestProperty("User-Agent", "Resourceloader/2.1");
+            conn.setRequestProperty("User-Agent", "Resourceloader/" + plugin.getDescription().getVersion());
             conn.setConnectTimeout(15000);
             conn.setReadTimeout(30000);
-            
+
             int responseCode = conn.getResponseCode();
             if (responseCode != HttpURLConnection.HTTP_OK) {
                 throw new IOException("Failed to download resource pack. Server returned code: " + responseCode);
             }
-            
+
             String etag = conn.getHeaderField("ETag");
             if (etag != null) {
                 etagCache.put(url, etag);
@@ -119,26 +119,37 @@ public class ResourcePackCache {
             Files.createDirectories(destination.getParent());
 
             long contentLength = conn.getContentLengthLong();
-            
+
             // Create progress bar if we have a player and know the content length
             if (player != null && contentLength > 0) {
                 progressBar = createProgressBar(player);
             }
 
             try (InputStream in = new BufferedInputStream(conn.getInputStream());
-                OutputStream out = new BufferedOutputStream(Files.newOutputStream(destination))) {
+                    OutputStream out = new BufferedOutputStream(Files.newOutputStream(destination))) {
 
                 byte[] buffer = new byte[8192];
                 long totalBytesRead = 0;
                 int bytesRead;
 
+                long lastUpdateTime = 0;
+                double lastProgress = 0;
+
                 while ((bytesRead = in.read(buffer)) != -1) {
                     out.write(buffer, 0, bytesRead);
                     totalBytesRead += bytesRead;
-                    
+
                     if (progressBar != null && contentLength > 0) {
                         double progress = (double) totalBytesRead / contentLength;
-                        updateProgressBar(progressBar, progress);
+                        long currentTime = System.currentTimeMillis();
+
+                        // Throttle updates: Max 1 update per 500ms OR if progress changed by > 1%, and
+                        // always at 100%
+                        if (currentTime - lastUpdateTime > 500 || progress - lastProgress >= 0.01 || progress >= 1.0) {
+                            updateProgressBar(progressBar, progress);
+                            lastUpdateTime = currentTime;
+                            lastProgress = progress;
+                        }
                     }
                 }
             }
@@ -170,10 +181,9 @@ public class ResourcePackCache {
 
     private BossBar createProgressBarSync(Player player) {
         BossBar bar = Bukkit.createBossBar(
-            "Downloading Resource Pack...",
-            BarColor.BLUE,
-            BarStyle.SOLID
-        );
+                "Downloading Resource Pack...",
+                BarColor.BLUE,
+                BarStyle.SOLID);
         bar.setProgress(0.0);
         bar.addPlayer(player);
         downloadBars.put(player.getUniqueId(), bar);
@@ -215,7 +225,8 @@ public class ResourcePackCache {
             StringBuilder hexString = new StringBuilder();
             for (byte b : hash) {
                 String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) hexString.append('0');
+                if (hex.length() == 1)
+                    hexString.append('0');
                 hexString.append(hex);
             }
             return hexString.toString().substring(0, 8);
@@ -230,17 +241,17 @@ public class ResourcePackCache {
 
         try {
             Files.walk(cacheDir)
-                .filter(Files::isRegularFile)
-                .forEach(file -> {
-                    try {
-                        if (Files.getLastModifiedTime(file).toMillis() < expiryMillis) {
-                            Files.delete(file);
-                            logger.info("Deleted expired cache file: " + file.getFileName());
+                    .filter(Files::isRegularFile)
+                    .forEach(file -> {
+                        try {
+                            if (Files.getLastModifiedTime(file).toMillis() < expiryMillis) {
+                                Files.delete(file);
+                                logger.info("Deleted expired cache file: " + file.getFileName());
+                            }
+                        } catch (IOException e) {
+                            logger.warning("Failed to check/delete cache file: " + e.getMessage());
                         }
-                    } catch (IOException e) {
-                        logger.warning("Failed to check/delete cache file: " + e.getMessage());
-                    }
-                });
+                    });
         } catch (IOException e) {
             logger.warning("Failed to clean cache directory: " + e.getMessage());
         }
@@ -249,14 +260,14 @@ public class ResourcePackCache {
     public void clearCache() {
         try {
             Files.walk(cacheDir)
-                .filter(Files::isRegularFile)
-                .forEach(file -> {
-                    try {
-                        Files.delete(file);
-                    } catch (IOException e) {
-                        logger.warning("Failed to delete cache file: " + file.getFileName());
-                    }
-                });
+                    .filter(Files::isRegularFile)
+                    .forEach(file -> {
+                        try {
+                            Files.delete(file);
+                        } catch (IOException e) {
+                            logger.warning("Failed to delete cache file: " + file.getFileName());
+                        }
+                    });
             etagCache.clear();
             logger.info("Resource pack cache cleared");
         } catch (IOException e) {
