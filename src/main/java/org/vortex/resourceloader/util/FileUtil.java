@@ -5,6 +5,8 @@ import java.io.*;
 import java.nio.file.*;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 import java.util.zip.*;
 import java.util.logging.Logger;
@@ -14,11 +16,31 @@ public class FileUtil {
     private static final String TEMP_PREFIX = "resourceloader_";
     private static final String TEMP_SUFFIX = ".tmp";
 
+    // Packs are hashed on every send; only re-read a file when it changed
+    private record CachedHash(long size, long lastModified, byte[] hash) {
+    }
+
+    private static final Map<String, CachedHash> SHA1_CACHE = new ConcurrentHashMap<>();
+
     public static byte[] calcSHA1(File file) throws IOException {
         if (file == null || !file.exists()) {
             throw new FileNotFoundException("File does not exist");
         }
 
+        String key = file.getAbsolutePath();
+        long size = file.length();
+        long lastModified = file.lastModified();
+        CachedHash cached = SHA1_CACHE.get(key);
+        if (cached != null && cached.size() == size && cached.lastModified() == lastModified) {
+            return cached.hash().clone();
+        }
+
+        byte[] hash = computeSHA1(file);
+        SHA1_CACHE.put(key, new CachedHash(size, lastModified, hash));
+        return hash.clone();
+    }
+
+    private static byte[] computeSHA1(File file) throws IOException {
         try {
         MessageDigest digest = MessageDigest.getInstance("SHA-1");
             try (BufferedInputStream bis = new BufferedInputStream(new FileInputStream(file), BUFFER_SIZE)) {

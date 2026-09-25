@@ -47,10 +47,10 @@ public final class Resourceloader extends JavaPlugin {
         if (getConfig().getBoolean("enforcement.use-server-properties", false)) {
             new EarlyPackLoader(this);
             getLogger().info("Early resource pack loading enabled with server.properties");
-        } else {
-            // Register regular resource pack enforcer
-            getServer().getPluginManager().registerEvents(new ResourcePackEnforcer(this), this);
         }
+
+        // Always registered: it also applies /autoload preferences on join
+        getServer().getPluginManager().registerEvents(new ResourcePackEnforcer(this), this);
 
         // Register resource pack status listener
         getServer().getPluginManager().registerEvents(new ResourcePackStatusListener(this), this);
@@ -90,6 +90,10 @@ public final class Resourceloader extends JavaPlugin {
     }
 
     public MergeGUI getMergeGUI() {
+        // gui.enabled may have been switched on by /resourcereload after startup
+        if (mergeGUI == null) {
+            mergeGUI = new MergeGUI(this);
+        }
         return mergeGUI;
     }
 

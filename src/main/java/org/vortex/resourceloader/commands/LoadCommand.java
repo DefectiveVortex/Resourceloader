@@ -4,13 +4,11 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.util.StringUtil;
 import org.vortex.resourceloader.Resourceloader;
-import org.vortex.resourceloader.util.FileUtil;
 
-import java.io.File;
+import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -41,142 +39,41 @@ public class LoadCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
 
-            loadResourcePack(player, "server", defaultPackPath);
+            loadResourcePack(player, "server");
             return true;
         }
 
-        String packName = findPackName(args[0]);
-        ConfigurationSection packs = plugin.getConfig().getConfigurationSection("resource-packs");
-
-        if (packName == null || packs == null) {
+        String packName = plugin.getPackManager().findPackKey(args[0]);
+        if (packName == null) {
             player.sendMessage(plugin.getMessageManager().formatMessage("resource-packs.not-found",
                     "pack", args[0]));
             return true;
         }
 
-        String packPath = packs.getString(packName);
-        loadResourcePack(player, packName, packPath);
+        loadResourcePack(player, packName);
         return true;
     }
 
-    private String findPackName(String input) {
-        if (plugin.getResourcePacks().containsKey(input)) {
-            return input;
-        }
-        for (String name : plugin.getResourcePacks().keySet()) {
-            if (name.equalsIgnoreCase(input)) {
-                return name;
-            }
-        }
-        return null;
-    }
-
-    public void loadResourcePack(Player player, String packName, String packPath) {
+    public void loadResourcePack(Player player, String packName) {
+        String packPath = plugin.getPackManager().resolvePackPath(packName);
         if (packPath == null || packPath.isEmpty()) {
             player.sendMessage(plugin.getMessageManager().formatMessage("resource-packs.invalid-path",
                     "pack", packName));
             return;
         }
 
-        if (packPath.startsWith("http://") || packPath.startsWith("https://")) {
-            player.sendMessage(plugin.getMessageManager().formatMessage("resource-packs.loading",
-                    "pack", packName));
-
-            plugin.getPackManager().getPackCache().getCachedPack(packPath, packName)
-                    .thenApplyAsync(cachedFile -> {
-                        // Calculate hash asynchronously
-                        try {
-                            return new PackData(cachedFile, FileUtil.calcSHA1(cachedFile));
-                        } catch (Exception e) {
-                            throw new RuntimeException(e);
-                        }
-                    })
-                    .thenAccept(packData -> {
-                        // Return to main thread for Bukkit API
-                        plugin.getServer().getScheduler().runTask(plugin, () -> {
-                            try {
-                                String downloadUrl = plugin.getPackManager().getPackServer().createDownloadURL(player,
-                                        packName, packData.file.getName());
-                                sendPackToPlayer(player, downloadUrl, packData.hash, packName);
-                            } catch (Exception e) {
-                                player.sendMessage(
-                                        plugin.getMessageManager().formatMessage("resource-packs.load-failed",
-                                                "error", e.getMessage()));
-                                plugin.getLogger().warning("Failed to load cached pack: " + e.getMessage());
-                            }
-                        });
-                    })
-                    .exceptionally(e -> {
-                        String errorMessage = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
-                        plugin.getServer().getScheduler().runTask(plugin, () -> {
-                            player.sendMessage(plugin.getMessageManager().formatMessage("resource-packs.load-failed",
-                                    "error", errorMessage));
-                        });
-                        plugin.getLogger().warning("Failed to load pack: " + e.getMessage());
-                        return null;
-                    });
-        } else {
-            File packFile = plugin.getResourcePacks().get(packName);
-            if (packFile == null || !packFile.exists()) {
+        player.sendMessage(plugin.getMessageManager().formatMessage("resource-packs.loading", "pack", packName));
+        plugin.getPackManager().sendPack(player, packName, false).exceptionally(e -> {
+            if (e instanceof FileNotFoundException) {
                 player.sendMessage(plugin.getMessageManager().getMessage("resource-packs.file-not-found"));
-                return;
-            }
-
-            // Offload local file hashing to async task as well
-            plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
-                try {
-                    byte[] hash = FileUtil.calcSHA1(packFile);
-                    plugin.getServer().getScheduler().runTask(plugin, () -> {
-                        String finalUrl = plugin.getPackManager().getPackServer().createDownloadURL(player, packName,
-                                packPath);
-                        sendPackToPlayer(player, finalUrl, hash, packName);
-                    });
-                } catch (Exception e) {
-                    plugin.getServer().getScheduler().runTask(plugin, () -> {
-                        player.sendMessage(plugin.getMessageManager().formatMessage("resource-packs.load-failed",
-                                "error", e.getMessage()));
-                    });
-                    plugin.getLogger().warning("Resource pack loading failed for " + packName + ": " + e.getMessage());
-                    e.printStackTrace();
-                }
-            });
-        }
-    }
-
-    private record PackData(File file, byte[] hash) {
-    }
-
-    private void sendPackToPlayer(Player player, String url, byte[] hash, String packName) {
-        plugin.getLogger().info("Sending resource pack '" + packName + "' to player " + player.getName());
-        plugin.getLogger().info("URL: " + url);
-
-        try {
-            // Modern 1.20.3+ API with UUID and prompt
-            // We use reflection or check version if we want to be strictly safe, but since
-            // we updated api-version to 1.21
-            // we can try to use the modern method if available, or fallback.
-            // For now, standard setResourcePack is fine, but we should be aware of the
-            // prompt message support.
-
-            // In 1.20.3+, setResourcePack(UUID, String, byte[], String, boolean) exists.
-            // But since we are compiling against a potentially older API jar (implied by
-            // context), we stick to standard.
-            // However, we will log explicitly.
-
-            if (hash != null) {
-                player.setResourcePack(url, hash);
             } else {
-                player.setResourcePack(url);
+                player.sendMessage(plugin.getMessageManager().formatMessage("resource-packs.load-failed",
+                        "error", String.valueOf(e.getMessage())));
             }
-
-            player.sendMessage(plugin.getMessageManager().formatMessage("resource-packs.loading", "pack", packName));
-
-        } catch (Exception e) {
-            plugin.getLogger()
-                    .severe("Failed to invoke setResourcePack for " + player.getName() + ": " + e.getMessage());
-            player.sendMessage(plugin.getMessageManager().formatMessage("resource-packs.load-failed", "error",
-                    "Internal error sending pack"));
-        }
+            plugin.getLogger().warning("Failed to load pack '" + packName + "' for " + player.getName() + ": "
+                    + e.getMessage());
+            return null;
+        });
     }
 
     @Override

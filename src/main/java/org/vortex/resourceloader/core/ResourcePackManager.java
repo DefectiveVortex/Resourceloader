@@ -12,8 +12,15 @@ import java.util.logging.Logger;
 import java.util.UUID;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -140,64 +147,139 @@ public class ResourcePackManager {
                 }
             }
         }
+
+        // Packs copied into the folder while the server was off never produce a watcher event
+        if (plugin.getConfig().getBoolean("storage.auto-detection", true)) {
+            registerUntrackedPacks(packDirectory, serverPack);
+        }
     }
 
-    public void loadResourcePack(Player player, String packName, String packPath) {
-        if (packPath == null || packPath.isEmpty()) {
-            player.sendMessage(plugin.getMessageManager().formatMessage("resource-packs.invalid-pack",
-                "pack", packName));
+    private void registerUntrackedPacks(File packDirectory, String serverPack) {
+        File[] files = packDirectory.listFiles((dir, name) -> name.toLowerCase().endsWith(".zip"));
+        if (files == null) {
             return;
         }
 
-        try {
-            if (packPath.startsWith("http://") || packPath.startsWith("https://")) {
-                player.sendMessage(plugin.getMessageManager().formatMessage("resource-packs.loading",
-                    "pack", packName));
-
-                packCache.getCachedPack(packPath, packName)
-                    .thenAccept(cachedFile -> {
-                        try {
-                            byte[] fileHash = FileUtil.calcSHA1(cachedFile);
-                            String downloadUrl = packServer.createDownloadURL(player, packName, cachedFile.getName());
-                            player.setResourcePack(downloadUrl, fileHash);
-                            player.sendMessage(plugin.getMessageManager().getMessage("resource-packs.load-success"));
-                        } catch (Exception e) {
-                            player.sendMessage(plugin.getMessageManager().formatMessage("resource-packs.load-failed",
-                                "error", e.getMessage()));
-                            logger.warning("Failed to load cached pack: " + e.getMessage());
-                        }
-                    })
-                    .exceptionally(e -> {
-                        player.sendMessage(plugin.getMessageManager().formatMessage("resource-packs.load-failed",
-                            "error", e.getMessage()));
-                        logger.warning("Failed to load pack: " + e.getMessage());
-                        return null;
-                    });
-            } else {
-                File packFile = resourcePacks.get(packName);
-                if (packFile == null || !packFile.exists()) {
-                    player.sendMessage(plugin.getMessageManager().getMessage("resource-packs.invalid-pack"));
-                    return;
-                }
-                String finalUrl = packServer.createDownloadURL(player, packName, packPath);
-                byte[] hash = FileUtil.calcSHA1(packFile);
-
-                if (hash != null) {
-                    player.setResourcePack(finalUrl, hash);
-                } else {
-                    player.setResourcePack(finalUrl);
-                }
-
-                player.sendMessage(plugin.getMessageManager().formatMessage("resource-packs.loading",
-                    "pack", packName));
-            }
-
-            logger.info("Resource pack '" + packName + "' load attempted for player " + player.getName());
-        } catch (Exception e) {
-            player.sendMessage(plugin.getMessageManager().formatMessage("resource-packs.load-failed",
-                "error", e.getMessage()));
-            logger.warning("Resource pack loading failed: " + e.getMessage());
+        Set<String> tracked = new HashSet<>();
+        if (serverPack != null) {
+            tracked.add(serverPack);
         }
+        ConfigurationSection packs = plugin.getConfig().getConfigurationSection("resource-packs");
+        if (packs != null) {
+            for (String key : packs.getKeys(false)) {
+                String value = packs.getString(key);
+                if (value != null) {
+                    tracked.add(value);
+                }
+            }
+        }
+
+        Arrays.sort(files);
+        for (File file : files) {
+            if (!file.isFile() || tracked.contains(file.getName())) {
+                continue;
+            }
+            if (!FileUtil.isValidResourcePack(file)) {
+                logger.warning("Not registering " + file.getName() + ": it is not a valid zip file");
+                continue;
+            }
+            handleNewResourcePack(file);
+        }
+    }
+
+    /** The config key of a known pack, matching case-insensitively, or null. */
+    public String findPackKey(String input) {
+        if (input == null) {
+            return null;
+        }
+        if (resourcePacks.containsKey(input)) {
+            return input;
+        }
+        for (String name : resourcePacks.keySet()) {
+            if (name.equalsIgnoreCase(input)) {
+                return name;
+            }
+        }
+        return null;
+    }
+
+    /** The configured file name or URL behind a pack key ("server" is the default pack). */
+    public String resolvePackPath(String packKey) {
+        if ("server".equals(packKey)) {
+            return plugin.getConfig().getString("server-pack");
+        }
+        return plugin.getConfig().getString("resource-packs." + packKey);
+    }
+
+    /** Stable id for a pack, so status events can be matched to the pack that caused them. */
+    public static UUID packId(String packKey) {
+        return UUID.nameUUIDFromBytes(("resourceloader:" + packKey).getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Sends a pack to a player. Downloading and hashing happen off the main thread; the returned future
+     * completes on the main thread with the id the pack was sent under.
+     *
+     * @param force whether the client should treat the pack as required
+     */
+    public CompletableFuture<UUID> sendPack(Player player, String packKey, boolean force) {
+        String packPath = resolvePackPath(packKey);
+        CompletableFuture<UUID> result = new CompletableFuture<>();
+        if (packPath == null || packPath.isEmpty()) {
+            result.completeExceptionally(new FileNotFoundException("No file or URL configured for pack '" + packKey + "'"));
+            return result;
+        }
+
+        // The pack server resolves local packs by their configured path (which may include a subfolder)
+        // and URL packs by their file name in the cache folder
+        boolean remote = packPath.startsWith("http://") || packPath.startsWith("https://");
+        CompletableFuture<File> source;
+        if (remote) {
+            source = packCache.getCachedPack(packPath, packKey, player);
+        } else {
+            File packFile = resourcePacks.get(packKey);
+            if (packFile == null) {
+                packFile = new File(getResourcePackDirectory(), packPath);
+            }
+            if (!packFile.isFile()) {
+                result.completeExceptionally(new FileNotFoundException("Pack file not found: " + packFile.getName()));
+                return result;
+            }
+            source = CompletableFuture.completedFuture(packFile);
+        }
+
+        source.thenApplyAsync(file -> {
+            try {
+                return Map.entry(file, FileUtil.calcSHA1(file));
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }).whenComplete((packData, error) -> plugin.getServer().getScheduler().runTask(plugin, () -> {
+            if (error != null) {
+                result.completeExceptionally(error instanceof CompletionException && error.getCause() != null
+                    ? error.getCause() : error);
+                return;
+            }
+            if (!player.isOnline()) {
+                result.completeExceptionally(new IllegalStateException(player.getName() + " is no longer online"));
+                return;
+            }
+            try {
+                UUID id = packId(packKey);
+                String url = packServer.createDownloadURL(player, packKey, remote ? packData.getKey().getName() : packPath);
+                logger.info("Sending resource pack '" + packKey + "' to " + player.getName());
+                if (plugin.getConfig().getBoolean("enforcement.use-server-properties", false)) {
+                    // Keep the pack the server sends from server.properties
+                    player.addResourcePack(id, url, packData.getValue(), null, force);
+                } else {
+                    player.setResourcePack(id, url, packData.getValue(), null, force);
+                }
+                result.complete(id);
+            } catch (Exception e) {
+                result.completeExceptionally(e);
+            }
+        }));
+        return result;
     }
 
     private File getResourcePackDirectory() {
@@ -234,7 +316,7 @@ public class ResourcePackManager {
         savePreferences();
     }
 
-    private String sanitizePackName(String packName) {
+    public static String sanitizePackName(String packName) {
         // Remove file extension if present
         if (packName.toLowerCase().endsWith(".zip")) {
             packName = packName.substring(0, packName.length() - 4);
@@ -264,7 +346,7 @@ public class ResourcePackManager {
     }
 
     public void handleNewResourcePack(File packFile) {
-        if (!packFile.getName().toLowerCase().endsWith(".zip")) {
+        if (!packFile.getName().toLowerCase().endsWith(".zip") || !packFile.isFile()) {
             return;
         }
 

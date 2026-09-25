@@ -12,8 +12,9 @@ import java.net.URI;
 import java.net.HttpURLConnection;
 import java.nio.file.*;
 import java.security.MessageDigest;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
@@ -22,19 +23,31 @@ public class ResourcePackCache {
     private final Resourceloader plugin;
     private final Logger logger;
     private final Path cacheDir;
-    private final Map<String, String> etagCache;
+    private static final String ETAG_SUFFIX = "|etag";
+    private static final String LAST_MODIFIED_SUFFIX = "|last-modified";
+    private static final long REVALIDATE_MILLIS = 60_000;
+    private final Path validatorsFile;
+    private final Properties validators;
+    private final Map<String, Long> lastValidated;
     private final Map<UUID, BossBar> downloadBars;
 
     public ResourcePackCache(Resourceloader plugin) {
         this.plugin = plugin;
         this.logger = plugin.getLogger();
         this.cacheDir = plugin.getDataFolder().toPath().resolve("cache");
-        this.etagCache = new HashMap<>();
-        this.downloadBars = new HashMap<>();
+        this.validatorsFile = cacheDir.resolve("cache-meta.properties");
+        this.validators = new Properties();
+        this.lastValidated = new ConcurrentHashMap<>();
+        this.downloadBars = new ConcurrentHashMap<>();
 
         try {
             Files.createDirectories(cacheDir);
             cleanOldCache();
+            if (Files.isRegularFile(validatorsFile)) {
+                try (InputStream in = Files.newInputStream(validatorsFile)) {
+                    validators.load(in);
+                }
+            }
         } catch (IOException e) {
             logger.warning("Failed to create cache directory: " + e.getMessage());
         }
@@ -45,47 +58,33 @@ public class ResourcePackCache {
     }
 
     public CompletableFuture<File> getCachedPack(String url, String packName, Player player) {
-        if (!plugin.getConfig().getBoolean("cache.enabled", true)) {
-            return CompletableFuture.supplyAsync(() -> {
-                try {
-                    Path tempFile = Files.createTempFile("resourcepack_", ".zip");
-                    downloadPack(url, tempFile, player);
-                    return tempFile.toFile();
-                } catch (IOException e) {
-                    logger.warning("Failed to download resource pack " + packName + ": " + e.getMessage());
-                    throw new RuntimeException(e);
-                }
-            });
-        }
-
         return CompletableFuture.supplyAsync(() -> {
+            // The pack server only serves files from the packs and cache folders, so even with
+            // caching disabled the download has to land in the cache folder
+            Path cachePath = cacheDir.resolve(packName + "_" + getUrlHash(url) + ".zip");
+            boolean useCache = plugin.getConfig().getBoolean("cache.enabled", true);
+            boolean cached = useCache && Files.isRegularFile(cachePath);
+
+            // Several players joining at once should not each hit the origin
+            Long checked = lastValidated.get(url);
+            if (cached && checked != null && System.currentTimeMillis() - checked < REVALIDATE_MILLIS) {
+                return cachePath.toFile();
+            }
+
             try {
-                String cachedEtag = etagCache.get(url);
-                Path cachePath = cacheDir.resolve(packName + "_" + getUrlHash(url) + ".zip");
-
-                if (Files.exists(cachePath)) {
-                    HttpURLConnection conn = (HttpURLConnection) URI.create(url).toURL().openConnection();
-                    conn.setRequestMethod("HEAD");
-                    if (cachedEtag != null) {
-                        conn.setRequestProperty("If-None-Match", cachedEtag);
-                    }
-
-                    int responseCode = conn.getResponseCode();
-                    if (responseCode == HttpURLConnection.HTTP_NOT_MODIFIED) {
-                        logger.info("Using cached version of " + packName);
-                        return cachePath.toFile();
-                    }
-
-                    String newEtag = conn.getHeaderField("ETag");
-                    if (newEtag != null && newEtag.equals(cachedEtag)) {
-                        return cachePath.toFile();
-                    }
+                if (downloadPack(url, cachePath, player, cached)) {
+                    logger.info("Downloaded and cached " + packName);
+                } else {
+                    logger.info("Using cached version of " + packName);
                 }
-
-                logger.info("Downloading and caching " + packName);
-                downloadPack(url, cachePath, player);
+                lastValidated.put(url, System.currentTimeMillis());
                 return cachePath.toFile();
             } catch (IOException e) {
+                if (cached) {
+                    logger.warning("Could not reach " + url + " (" + e.getMessage() + "); using cached copy of "
+                        + packName);
+                    return cachePath.toFile();
+                }
                 logger.warning("Failed to cache resource pack " + packName + ": " + e.getMessage());
                 throw new RuntimeException("Failed to cache resource pack: " + e.getMessage(), e);
             } catch (Exception e) {
@@ -95,9 +94,16 @@ public class ResourcePackCache {
         });
     }
 
-    private void downloadPack(String url, Path destination, Player player) throws IOException {
+    /**
+     * Downloads {@code url} into {@code destination}. With {@code conditional}, the request carries the
+     * validators of the cached copy and nothing is downloaded if the origin says it is unchanged.
+     *
+     * @return true if a new copy was downloaded, false if the cached copy is still current
+     */
+    private boolean downloadPack(String url, Path destination, Player player, boolean conditional) throws IOException {
         HttpURLConnection conn = null;
         BossBar progressBar = null;
+        Path tempFile = null;
 
         try {
             conn = (HttpURLConnection) URI.create(url).toURL().openConnection();
@@ -105,18 +111,27 @@ public class ResourcePackCache {
             conn.setRequestProperty("User-Agent", "Resourceloader/" + plugin.getDescription().getVersion());
             conn.setConnectTimeout(15000);
             conn.setReadTimeout(30000);
+            if (conditional) {
+                String etag = validators.getProperty(url + ETAG_SUFFIX);
+                String lastModified = validators.getProperty(url + LAST_MODIFIED_SUFFIX);
+                if (etag != null) {
+                    conn.setRequestProperty("If-None-Match", etag);
+                }
+                if (lastModified != null) {
+                    conn.setRequestProperty("If-Modified-Since", lastModified);
+                }
+            }
 
             int responseCode = conn.getResponseCode();
+            if (conditional && responseCode == HttpURLConnection.HTTP_NOT_MODIFIED) {
+                return false;
+            }
             if (responseCode != HttpURLConnection.HTTP_OK) {
                 throw new IOException("Failed to download resource pack. Server returned code: " + responseCode);
             }
 
-            String etag = conn.getHeaderField("ETag");
-            if (etag != null) {
-                etagCache.put(url, etag);
-            }
-
             Files.createDirectories(destination.getParent());
+            tempFile = Files.createTempFile(destination.getParent(), "download_", ".tmp");
 
             long contentLength = conn.getContentLengthLong();
 
@@ -126,7 +141,7 @@ public class ResourcePackCache {
             }
 
             try (InputStream in = new BufferedInputStream(conn.getInputStream());
-                    OutputStream out = new BufferedOutputStream(Files.newOutputStream(destination))) {
+                    OutputStream out = new BufferedOutputStream(Files.newOutputStream(tempFile))) {
 
                 byte[] buffer = new byte[8192];
                 long totalBytesRead = 0;
@@ -153,6 +168,12 @@ public class ResourcePackCache {
                     }
                 }
             }
+
+            // Only a complete download replaces the cached copy
+            Files.move(tempFile, destination, StandardCopyOption.REPLACE_EXISTING);
+            tempFile = null;
+            rememberValidators(url, conn.getHeaderField("ETag"), conn.getHeaderField("Last-Modified"));
+            return true;
         } finally {
             if (conn != null) {
                 conn.disconnect();
@@ -160,6 +181,27 @@ public class ResourcePackCache {
             if (progressBar != null) {
                 removeProgressBar(progressBar);
             }
+            if (tempFile != null) {
+                Files.deleteIfExists(tempFile);
+            }
+        }
+    }
+
+    private synchronized void rememberValidators(String url, String etag, String lastModified) {
+        setOrRemove(url + ETAG_SUFFIX, etag);
+        setOrRemove(url + LAST_MODIFIED_SUFFIX, lastModified);
+        try (OutputStream out = Files.newOutputStream(validatorsFile)) {
+            validators.store(out, "Resourceloader: HTTP validators of cached URL packs");
+        } catch (IOException e) {
+            logger.warning("Failed to save cache metadata: " + e.getMessage());
+        }
+    }
+
+    private void setOrRemove(String key, String value) {
+        if (value == null) {
+            validators.remove(key);
+        } else {
+            validators.setProperty(key, value);
         }
     }
 
@@ -212,10 +254,10 @@ public class ResourcePackCache {
     }
 
     private void removeProgressBarSync(BossBar bar) {
-        bar.removeAll();
         for (Player player : bar.getPlayers()) {
             downloadBars.remove(player.getUniqueId());
         }
+        bar.removeAll();
     }
 
     private String getUrlHash(String url) {
@@ -242,6 +284,7 @@ public class ResourcePackCache {
         try {
             Files.walk(cacheDir)
                     .filter(Files::isRegularFile)
+                    .filter(file -> !file.equals(validatorsFile))
                     .forEach(file -> {
                         try {
                             if (Files.getLastModifiedTime(file).toMillis() < expiryMillis) {
@@ -268,7 +311,10 @@ public class ResourcePackCache {
                             logger.warning("Failed to delete cache file: " + file.getFileName());
                         }
                     });
-            etagCache.clear();
+            synchronized (this) {
+                validators.clear();
+            }
+            lastValidated.clear();
             logger.info("Resource pack cache cleared");
         } catch (IOException e) {
             logger.warning("Failed to clear cache directory: " + e.getMessage());

@@ -78,22 +78,16 @@ public class CheckPackCommand implements CommandExecutor, TabCompleter {
         
         // Show formatted results
         List<String> formattedResults = result.getFormattedIssues();
+        String issueColor = "§7";
         for (String line : formattedResults) {
             if (line.startsWith("Critical Issues:")) {
-                sender.sendMessage("§c" + line);
+                issueColor = "§c";
+                sender.sendMessage(issueColor + line);
             } else if (line.startsWith("Warnings:")) {
-                sender.sendMessage("§e" + line);
+                issueColor = "§e";
+                sender.sendMessage(issueColor + line);
             } else if (line.startsWith("- ")) {
-                // Individual issue
-                if (formattedResults.indexOf(line) > 0 && 
-                    formattedResults.get(formattedResults.indexOf(line) - 1).startsWith("Critical Issues:")) {
-                    sender.sendMessage("§c" + line);
-                } else if (formattedResults.indexOf(line) > 0 && 
-                           formattedResults.get(formattedResults.indexOf(line) - 1).startsWith("Warnings:")) {
-                    sender.sendMessage("§e" + line);
-                } else {
-                    sender.sendMessage("§7" + line);
-                }
+                sender.sendMessage(issueColor + line);
             } else {
                 sender.sendMessage("§7" + line);
             }

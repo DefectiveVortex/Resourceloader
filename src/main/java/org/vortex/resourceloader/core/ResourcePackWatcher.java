@@ -28,7 +28,7 @@ public class ResourcePackWatcher {
     private void startWatcher() {
         try {
             watchService = FileSystems.getDefault().newWatchService();
-            File packsDir = new File(plugin.getDataFolder(), "packs");
+            File packsDir = packManager.getResolvedResourcePackDirectory();
             if (!packsDir.exists()) {
                 packsDir.mkdirs();
             }

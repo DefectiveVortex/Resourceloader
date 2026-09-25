@@ -1,6 +1,5 @@
 package org.vortex.resourceloader.listeners;
 
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -8,12 +7,8 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerResourcePackStatusEvent;
-import org.bukkit.event.server.PluginDisableEvent;
-import org.bukkit.scheduler.BukkitTask;
 import org.vortex.resourceloader.Resourceloader;
-import org.vortex.resourceloader.util.FileUtil;
 
-import java.io.File;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -22,10 +17,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class ResourcePackEnforcer implements Listener {
     private final Resourceloader plugin;
-    private final Map<UUID, Integer> retryAttempts;
-    private final Map<UUID, BukkitTask> pendingRetries;
+    // Pack each player was sent on join while enforcement is on; only this pack's status can kick them
+    private final Map<UUID, UUID> enforcedPacks;
     private final Set<UUID> restrictedPlayers;
-    private final Map<UUID, Boolean> packLoading;
     private static final String[] RESTRICTED_COMMANDS = {
         "tp", "teleport", "spawn", "home", "warp", "tpa",
         "sethome", "setwarp", "back", "return"
@@ -33,139 +27,92 @@ public class ResourcePackEnforcer implements Listener {
 
     public ResourcePackEnforcer(Resourceloader plugin) {
         this.plugin = plugin;
-        this.retryAttempts = new ConcurrentHashMap<>();
-        this.pendingRetries = new ConcurrentHashMap<>();
+        this.enforcedPacks = new ConcurrentHashMap<>();
         this.restrictedPlayers = ConcurrentHashMap.newKeySet();
-        this.packLoading = new ConcurrentHashMap<>();
 
         // Register additional events
         plugin.getServer().getPluginManager().registerEvents(new RestrictedModeHandler(), plugin);
     }
 
+    private boolean enforcementActive() {
+        return plugin.getConfig().getBoolean("enforcement.enabled", false);
+    }
+
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        if (player.hasPermission("resourceloader.bypass")) {
-            plugin.getLogger().info("Player " + player.getName() + " has bypass permission, skipping pack loading");
-            return;
-        }
+        boolean enforce = enforcementActive() && !player.hasPermission("resourceloader.bypass");
 
-        // Priority 1: Check for autoload preference first
+        // Priority 1: the player's own autoload preference (bypass only skips forced packs, not this)
         List<String> preferences = plugin.getPackManager().getPlayerPreferences(player.getUniqueId());
         if (!preferences.isEmpty()) {
-            String preferredPack = preferences.get(0);
-            plugin.getLogger().info("Loading autoload preference '" + preferredPack + "' for player " + player.getName());
-            tryLoadPack(player, preferredPack, true);
-            return;
+            String preferredPack = plugin.getPackManager().findPackKey(preferences.get(0));
+            if (preferredPack != null) {
+                plugin.getLogger().info("Loading autoload preference '" + preferredPack + "' for player " + player.getName());
+                sendJoinPack(player, preferredPack, "Autoload", enforce);
+                return;
+            }
+            plugin.getLogger().warning("Autoload pack '" + preferences.get(0) + "' of " + player.getName()
+                + " no longer exists");
         }
 
-        // Priority 2: Fall back to enforcement if no autoload preference
-        if (plugin.getConfig().getBoolean("enforcement.enabled", false)) {
+        // Priority 2: the enforced server pack. With use-server-properties the vanilla server sends it.
+        if (enforce && !plugin.getConfig().getBoolean("enforcement.use-server-properties", false)) {
             String serverPack = plugin.getConfig().getString("server-pack");
             if (serverPack != null && !serverPack.isEmpty()) {
                 plugin.getLogger().info("Loading enforced server pack for player " + player.getName());
-                tryLoadPack(player, "server", false);
+                sendJoinPack(player, "server", "Enforcement", true);
                 return;
             }
+            plugin.getLogger().warning("Server pack is not configured but enforcement is enabled");
+        } else if (player.hasPermission("resourceloader.bypass") && enforcementActive()) {
+            plugin.getLogger().info("Player " + player.getName() + " has bypass permission, skipping pack enforcement");
         }
-
-        plugin.getLogger().info("No autoload preference or enforcement configured for player " + player.getName());
     }
 
-    private void tryLoadPack(Player player, String packName, boolean isAutoload) {
-        try {
-            String packPath;
-            if (packName.equals("server")) {
-                packPath = plugin.getConfig().getString("server-pack");
-                if (packPath == null || packPath.isEmpty()) {
-                    plugin.getLogger().warning("Server pack is not configured but enforcement is enabled");
-                    return;
-                }
-            } else {
-                ConfigurationSection packs = plugin.getConfig().getConfigurationSection("resource-packs");
-                if (packs == null) {
-                    plugin.getLogger().warning("No resource packs configured for autoload pack: " + packName);
-                    return;
-                }
-                packPath = packs.getString(packName);
-                if (packPath == null || packPath.isEmpty()) {
-                    plugin.getLogger().warning("Pack '" + packName + "' not found in configuration for player " + player.getName());
-                    return;
-                }
-            }
-
-            String logPrefix = isAutoload ? "Autoload" : "Enforcement";
-            plugin.getLogger().info(logPrefix + ": Attempting to load pack '" + packName + "' for player " + player.getName());
-
-            if (packPath.startsWith("http")) {
-                plugin.getLogger().info(logPrefix + ": Loading URL-based pack from " + packPath);
-                plugin.getPackManager().getPackCache().getCachedPack(packPath, packName, player)
-                    .thenAccept(cachedFile -> {
-                        if (!player.isOnline()) return;
-                        try {
-                            byte[] hash = FileUtil.calcSHA1(cachedFile);
-                            String downloadUrl = plugin.getPackManager().getPackServer()
-                                .createDownloadURL(player, packName, cachedFile.getName());
-
-                            plugin.getServer().getScheduler().runTask(plugin, () -> {
-                                if (player.isOnline()) {
-                                    if (hash != null) {
-                                        player.setResourcePack(downloadUrl, hash);
-                                        plugin.getLogger().info(logPrefix + ": Successfully sent pack '" + packName + "' to " + player.getName());
-                                    } else {
-                                        player.setResourcePack(downloadUrl);
-                                        plugin.getLogger().info(logPrefix + ": Successfully sent pack '" + packName + "' to " + player.getName() + " (no hash)");
-                                    }
-                                }
-                            });
-                        } catch (Exception e) {
-                            plugin.getLogger().warning(logPrefix + ": Failed to load pack '" + packName + "' for " + player.getName() + ": " + e.getMessage());
-                        }
-                    })
-                    .exceptionally(e -> {
-                        plugin.getLogger().warning(logPrefix + ": Failed to cache pack '" + packName + "' for " + player.getName() + ": " + e.getMessage());
-                        return null;
-                    });
-            } else {
-                File packFile = new File(plugin.getPackManager().getResolvedResourcePackDirectory(), packPath);
-                if (packFile.exists()) {
-                    plugin.getLogger().info(logPrefix + ": Loading local pack file: " + packFile.getName());
-                    String downloadUrl = plugin.getPackManager().getPackServer()
-                        .createDownloadURL(player, packName, packPath);
-                    byte[] hash = FileUtil.calcSHA1(packFile);
-
-                    if (hash != null) {
-                        player.setResourcePack(downloadUrl, hash);
-                        plugin.getLogger().info(logPrefix + ": Successfully sent local pack '" + packName + "' to " + player.getName());
-                    } else {
-                        player.setResourcePack(downloadUrl);
-                        plugin.getLogger().info(logPrefix + ": Successfully sent local pack '" + packName + "' to " + player.getName() + " (no hash)");
-                    }
-                } else {
-                    plugin.getLogger().warning(logPrefix + ": Pack file not found: " + packFile.getAbsolutePath());
-                }
-            }
-        } catch (Exception e) {
-            String logPrefix = isAutoload ? "Autoload" : "Enforcement";
-            plugin.getLogger().warning(logPrefix + ": Failed to load pack '" + packName + "' for " + player.getName() + ": " + e.getMessage());
+    private void sendJoinPack(Player player, String packName, String logPrefix, boolean enforce) {
+        boolean required = enforce && plugin.getConfig().getBoolean("enforcement.kick-on-decline", true);
+        if (enforce) {
+            enforcedPacks.put(player.getUniqueId(), org.vortex.resourceloader.core.ResourcePackManager.packId(packName));
+            restrictedPlayers.add(player.getUniqueId());
         }
+        plugin.getPackManager().sendPack(player, packName, required).exceptionally(e -> {
+            plugin.getLogger().warning(logPrefix + ": Failed to load pack '" + packName + "' for "
+                + player.getName() + ": " + e.getMessage());
+            // Nothing reached the client, so do not keep the player waiting on it
+            enforcedPacks.remove(player.getUniqueId());
+            restrictedPlayers.remove(player.getUniqueId());
+            return null;
+        });
     }
 
     @EventHandler(priority = EventPriority.HIGH)
     public void onResourcePackStatus(PlayerResourcePackStatusEvent event) {
         Player player = event.getPlayer();
+        UUID enforcedId = enforcedPacks.get(player.getUniqueId());
 
-        if (player.hasPermission("resourceloader.bypass")) {
+        // Only the pack sent on join under enforcement is mandatory; packs a player
+        // picks with /load or /autoload afterwards can be declined freely
+        if (enforcedId == null || !enforcedId.equals(event.getID())) {
+            return;
+        }
+        if (!enforcementActive() || player.hasPermission("resourceloader.bypass")) {
+            release(player.getUniqueId());
             return;
         }
 
         switch (event.getStatus()) {
+            case SUCCESSFULLY_LOADED, DISCARDED:
+                release(player.getUniqueId());
+                break;
             case DECLINED:
+                release(player.getUniqueId());
                 if (plugin.getConfig().getBoolean("enforcement.kick-on-decline", true)) {
                     player.kickPlayer(plugin.getMessageManager().getMessage("enforcement.declined"));
                 }
                 break;
-            case FAILED_DOWNLOAD:
+            case FAILED_DOWNLOAD, INVALID_URL, FAILED_RELOAD:
+                release(player.getUniqueId());
                 if (plugin.getConfig().getBoolean("enforcement.kick-on-fail", true)) {
                     player.kickPlayer(plugin.getMessageManager().getMessage("enforcement.failed"));
                 }
@@ -175,28 +122,14 @@ public class ResourcePackEnforcer implements Listener {
         }
     }
 
-    private void cleanup(UUID playerId) {
-        retryAttempts.remove(playerId);
-        BukkitTask task = pendingRetries.remove(playerId);
-        if (task != null) {
-            task.cancel();
-        }
+    private void release(UUID playerId) {
+        enforcedPacks.remove(playerId);
         restrictedPlayers.remove(playerId);
-        packLoading.remove(playerId);
     }
 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
-        cleanup(event.getPlayer().getUniqueId());
-    }
-
-    @EventHandler
-    public void onPluginDisable(PluginDisableEvent event) {
-        if (event.getPlugin() == plugin) {
-            for (UUID playerId : pendingRetries.keySet()) {
-                cleanup(playerId);
-            }
-        }
+        release(event.getPlayer().getUniqueId());
     }
 
     private class RestrictedModeHandler implements Listener {

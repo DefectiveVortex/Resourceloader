@@ -25,10 +25,8 @@ public class ResourcePackStatusListener implements Listener {
                 plugin.getLogger().warning("Player " + playerName + " failed to download resource pack.");
                 break;
             case DECLINED:
+                // Kicking is ResourcePackEnforcer's job, and only for the enforced pack
                 plugin.getLogger().warning("Player " + playerName + " declined resource pack.");
-                if (plugin.getConfig().getBoolean("enforcement.kick-on-decline", false)) {
-                    event.getPlayer().kickPlayer(plugin.getMessageManager().getMessage("kick.declined"));
-                }
                 break;
             case ACCEPTED:
                 plugin.getLogger().info("Player " + playerName + " accepted resource pack download.");

@@ -22,6 +22,7 @@ public class ResourcePackServer {
     private final Resourceloader plugin;
     private final Logger logger;
     private HttpServer server;
+    private java.util.concurrent.ExecutorService executor;
     private final Map<UUID, String> playerTokens;
 
     public ResourcePackServer(Resourceloader plugin) {
@@ -91,13 +92,15 @@ public class ResourcePackServer {
                 }
             });
 
-            server.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(16));
+            executor = java.util.concurrent.Executors.newFixedThreadPool(16);
+            server.setExecutor(executor);
             server.start();
 
             String publicAddress = resolvePublicHost();
 
             logger.info("Resource pack server started on port " + port);
             logger.info("Public URL base: http://" + publicAddress + ":" + port);
+            warnIfUnreachable(publicAddress);
 
         } catch (IOException e) {
             logger.severe("Failed to start resource pack server: " + e.getMessage());
@@ -149,6 +152,31 @@ public class ResourcePackServer {
         if (server != null) {
             server.stop(0);
             logger.info("Resource pack server stopped");
+        }
+        if (executor != null) {
+            executor.shutdownNow();
+        }
+    }
+
+    /**
+     * An auto-detected loopback or container address is almost never what players can reach,
+     * and the only symptom is every pack download failing.
+     */
+    private void warnIfUnreachable(String host) {
+        if (!plugin.getConfig().getString("server.address", "").isBlank()
+                || plugin.getConfig().getBoolean("server.localhost", false)) {
+            return;
+        }
+        try {
+            InetAddress address = InetAddress.getByName(host);
+            byte[] ip = address.getAddress();
+            boolean containerRange = ip.length == 4 && (ip[0] & 0xFF) == 172 && (ip[1] & 0xF0) == 16;
+            if (address.isLoopbackAddress() || address.isLinkLocalAddress() || containerRange) {
+                logger.warning("Players will be sent pack URLs on " + host + ", which is probably not reachable"
+                    + " from their computers (loopback or Docker address). Set server.address in config.yml"
+                    + " to the IP or domain players use to join.");
+            }
+        } catch (IOException ignored) {
         }
     }
 

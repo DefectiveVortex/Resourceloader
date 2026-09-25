@@ -4,12 +4,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.commons.io.FileUtils;
 import org.vortex.resourceloader.util.FileUtil;
+import org.vortex.resourceloader.util.PackFormats;
 
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.nio.file.*;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
@@ -18,14 +21,27 @@ public class ResourcePackMerger {
     private final Resourceloader plugin;
     private final Logger logger;
     private static final int BUFFER_SIZE = 32768;
-    private static final int THREAD_POOL_SIZE = Runtime.getRuntime().availableProcessors();
+    private static final int THREAD_POOL_SIZE = Math.min(4, Runtime.getRuntime().availableProcessors());
+    private static final String MCMETA = "pack.mcmeta";
+
+    // JSON files the game itself combines across stacked packs instead of letting the top pack replace them.
+    // A merged pack has to reproduce that, otherwise lower packs silently lose their entries.
+    private static final Pattern LANG_FILE = Pattern.compile("assets/[^/]+/lang/[^/]+\\.json");
+    private static final Pattern ATLAS_FILE = Pattern.compile("assets/[^/]+/atlases/[^/]+\\.json");
+    private static final Pattern SOUNDS_FILE = Pattern.compile("assets/[^/]+/sounds\\.json");
+
     private final ExecutorService executor;
     private final Set<File> pendingCleanup;
+    private final ObjectMapper mapper = new ObjectMapper();
 
     public ResourcePackMerger(Resourceloader plugin) {
         this.plugin = plugin;
         this.logger = plugin.getLogger();
-        this.executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
+        this.executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE, r -> {
+            Thread t = new Thread(r, "Resourceloader-Merge");
+            t.setDaemon(true);
+            return t;
+        });
         this.pendingCleanup = ConcurrentHashMap.newKeySet();
     }
 
@@ -45,15 +61,14 @@ public class ResourcePackMerger {
 
     private void cleanupAllWorkDirs() {
         for (File dir : pendingCleanup) {
-            try {
-                FileUtils.deleteDirectory(dir);
-            } catch (IOException e) {
-                logger.warning("Failed to clean up work directory: " + e.getMessage());
-            }
+            cleanup(dir);
         }
-        pendingCleanup.clear();
     }
 
+    /**
+     * Merges packs into {@code outputName} in the packs directory.
+     * Packs are listed lowest priority first: a file in a later pack overrides the same file in an earlier one.
+     */
     public File mergeResourcePacks(List<File> inputPacks, String outputName) throws IOException {
         if (inputPacks.isEmpty()) {
             throw new IllegalArgumentException("No input packs provided");
@@ -80,10 +95,12 @@ public class ResourcePackMerger {
 
             logger.info("Merging " + inputPacks.size() + " resource packs...");
 
-            // Extract packs in parallel
+            // Extract packs in parallel, each into its own numbered directory
             List<Future<File>> extractFutures = new ArrayList<>();
-            for (File pack : inputPacks) {
-                extractFutures.add(executor.submit(() -> extractPack(pack, workDir)));
+            for (int i = 0; i < inputPacks.size(); i++) {
+                File pack = inputPacks.get(i);
+                File extractDir = new File(workDir, "input_" + i);
+                extractFutures.add(executor.submit(() -> extractPack(pack, extractDir)));
             }
 
             // Wait for all extractions to complete
@@ -91,8 +108,11 @@ public class ResourcePackMerger {
             for (Future<File> future : extractFutures) {
                 try {
                     extractedDirs.add(future.get());
-                } catch (Exception e) {
-                    throw new IOException("Failed to extract pack: " + e.getMessage(), e);
+                } catch (ExecutionException e) {
+                    throw new IOException("Failed to extract pack: " + e.getCause().getMessage(), e.getCause());
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Interrupted while extracting packs", e);
                 }
             }
 
@@ -100,18 +120,23 @@ public class ResourcePackMerger {
             File outputDir = new File(workDir, "merged");
             outputDir.mkdirs();
 
-            for (int i = 0; i < extractedDirs.size(); i++) {
-                File sourceDir = extractedDirs.get(i);
-                mergeDirectory(sourceDir, outputDir, i == extractedDirs.size() - 1);
+            List<Map<String, Object>> metas = new ArrayList<>();
+            for (File sourceDir : extractedDirs) {
+                Map<String, Object> meta = readJsonFile(new File(sourceDir, MCMETA));
+                if (meta != null) {
+                    metas.add(meta);
+                }
+                mergeDirectory(sourceDir, outputDir);
 
                 // Cleanup extracted directory after merging to free space
-                if (i < extractedDirs.size() - 1) {
-                    FileUtils.deleteDirectory(sourceDir);
-                }
+                FileUtils.deleteDirectory(sourceDir);
             }
 
+            // pack.mcmeta has to be final before the directory is zipped
+            writePackMeta(outputDir, metas);
+
             // Create output file
-            File tempOutputFile = new File(workDir, outputName + ".tmp");
+            File tempOutputFile = new File(workDir, "output.zip.tmp");
             zipDirectory(outputDir, tempOutputFile);
 
             // Validate the generated zip file
@@ -120,9 +145,6 @@ public class ResourcePackMerger {
             } catch (IOException e) {
                 throw new IOException("Generated merged pack is invalid: " + e.getMessage(), e);
             }
-
-            // Update pack.mcmeta with latest format
-            updatePackMeta(outputDir);
 
             // Move to final location atomically
             File finalOutputFile = new File(plugin.getPackManager().getResolvedResourcePackDirectory(), outputName);
@@ -140,17 +162,23 @@ public class ResourcePackMerger {
         }
     }
 
-    private File extractPack(File pack, File workDir) throws IOException {
-        if (!pack.getName().toLowerCase().endsWith(".zip")) {
-            return pack;
-        }
-
-        File extractDir = new File(workDir, pack.getName().replace(".zip", ""));
+    private File extractPack(File pack, File extractDir) throws IOException {
+        Path root = extractDir.getCanonicalFile().toPath();
         try (ZipFile zipFile = new ZipFile(pack)) {
             Enumeration<? extends ZipEntry> entries = zipFile.entries();
             while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
-                File entryFile = new File(extractDir, entry.getName());
+                if (entry.getName().startsWith("__MACOSX/")) {
+                    continue;
+                }
+
+                // Refuse entries such as "../../plugins/x.jar" that would land outside the work directory
+                Path target = root.resolve(entry.getName()).normalize();
+                if (!target.startsWith(root)) {
+                    logger.warning("Skipping unsafe entry '" + entry.getName() + "' in " + pack.getName());
+                    continue;
+                }
+                File entryFile = target.toFile();
 
                 if (entry.isDirectory()) {
                     entryFile.mkdirs();
@@ -171,136 +199,163 @@ public class ResourcePackMerger {
         return extractDir;
     }
 
-    private void mergeDirectory(File sourceDir, File targetDir, boolean isLastPack) throws IOException {
+    private void mergeDirectory(File sourceDir, File targetDir) throws IOException {
         if (!sourceDir.exists()) {
             return;
         }
 
-        Files.walk(sourceDir.toPath())
-                .filter(Files::isRegularFile)
-                .forEach(sourcePath -> {
-                    try {
-                        Path relativePath = sourceDir.toPath().relativize(sourcePath);
-                        File targetFile = new File(targetDir, relativePath.toString());
-
-                        if (sourcePath.toString().endsWith(".json")) {
-                            mergeJsonFile(targetFile, sourcePath.toFile(), isLastPack);
-                        } else {
-                            // For non-JSON files, newer pack always takes priority
-                            if (isLastPack || !targetFile.exists()) {
-                                FileUtils.copyFile(sourcePath.toFile(), targetFile);
-                            }
-                        }
-                    } catch (IOException e) {
-                        logger.warning("Failed to merge file " + sourcePath + ": " + e.getMessage());
-                    }
-                });
-    }
-
-    private void mergeJsonFile(File targetFile, File sourceFile, boolean isLastPack) throws IOException {
-        ObjectMapper mapper = new ObjectMapper();
-
-        // Read source file
-        Map<String, Object> sourceMap = readJsonFile(sourceFile, mapper);
-        if (sourceMap == null)
-            return;
-
-        // If target doesn't exist or this is the last pack, just copy/overwrite
-        if (!targetFile.exists() || isLastPack) {
-            targetFile.getParentFile().mkdirs();
-            FileUtils.copyFile(sourceFile, targetFile);
-            return;
+        List<Path> files;
+        try (Stream<Path> walk = Files.walk(sourceDir.toPath())) {
+            files = walk.filter(Files::isRegularFile).toList();
         }
 
-        // Read target file
-        Map<String, Object> targetMap = readJsonFile(targetFile, mapper);
-        if (targetMap == null) {
-            FileUtils.copyFile(sourceFile, targetFile);
-            return;
-        }
-
-        // Special handling for different types of JSON files
-        if (isModelFile(targetFile)) {
-            mergeModelFile(targetMap, sourceMap);
-        } else if (isLanguageFile(targetFile)) {
-            // Language files just need simple merging with override
-            targetMap.putAll(sourceMap);
-        } else {
-            // Default deep merge for other JSON files
-            deepMerge(targetMap, sourceMap);
-        }
-
-        // Write merged result
-        writeJsonFile(targetFile, targetMap, mapper);
-    }
-
-    private boolean isModelFile(File file) {
-        String path = file.getPath().toLowerCase();
-        return path.contains("models") || path.contains("blockstates") || path.endsWith(".model.json");
-    }
-
-    private boolean isLanguageFile(File file) {
-        return file.getPath().toLowerCase().contains("lang");
-    }
-
-    @SuppressWarnings("unchecked")
-    private void mergeModelFile(Map<String, Object> target, Map<String, Object> source) {
-        // Handle parent field - newer pack's parent takes priority
-        if (source.containsKey("parent")) {
-            target.put("parent", source.get("parent"));
-        }
-
-        // Merge textures
-        if (source.containsKey("textures")) {
-            Map<String, Object> targetTextures = (Map<String, Object>) target.computeIfAbsent("textures",
-                    k -> new HashMap<>());
-            targetTextures.putAll((Map<String, Object>) source.get("textures"));
-        }
-
-        // Merge elements - preserve both sets
-        if (source.containsKey("elements")) {
-            List<Object> targetElements = (List<Object>) target.computeIfAbsent("elements", k -> new ArrayList<>());
-            targetElements.addAll((List<Object>) source.get("elements"));
-        }
-
-        // Handle display settings
-        if (source.containsKey("display")) {
-            target.put("display", source.get("display"));
-        }
-
-        // Merge overrides with duplicate checking
-        if (source.containsKey("overrides")) {
-            List<Map<String, Object>> targetOverrides = (List<Map<String, Object>>) target.computeIfAbsent("overrides",
-                    k -> new ArrayList<>());
-            List<Map<String, Object>> sourceOverrides = (List<Map<String, Object>>) source.get("overrides");
-
-            Set<String> existingPredicates = new HashSet<>();
-            targetOverrides.forEach(override -> existingPredicates.add(override.toString()));
-
-            sourceOverrides.forEach(override -> {
-                if (!existingPredicates.contains(override.toString())) {
-                    targetOverrides.add(override);
+        for (Path sourcePath : files) {
+            String relative = sourceDir.toPath().relativize(sourcePath).toString().replace('\\', '/');
+            if (relative.equals(MCMETA)) {
+                continue; // combined separately in writePackMeta
+            }
+            File targetFile = new File(targetDir, relative);
+            try {
+                if (targetFile.exists() && isCombinedJson(relative)) {
+                    mergeJsonFile(relative, targetFile, sourcePath.toFile());
+                } else {
+                    // Same rule as the game: the higher pack's file replaces the lower one
+                    FileUtils.copyFile(sourcePath.toFile(), targetFile);
                 }
-            });
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private void deepMerge(Map<String, Object> target, Map<String, Object> source) {
-        for (String key : source.keySet()) {
-            Object sourceValue = source.get(key);
-            if (sourceValue instanceof Map) {
-                Map<String, Object> targetMap = (Map<String, Object>) target.computeIfAbsent(key, k -> new HashMap<>());
-                deepMerge(targetMap, (Map<String, Object>) sourceValue);
-            } else {
-                target.put(key, sourceValue);
+            } catch (IOException e) {
+                logger.warning("Failed to merge file " + relative + ": " + e.getMessage());
             }
         }
     }
 
-    private Map<String, Object> readJsonFile(File file, ObjectMapper mapper) {
+    private boolean isCombinedJson(String relative) {
+        return LANG_FILE.matcher(relative).matches()
+            || ATLAS_FILE.matcher(relative).matches()
+            || SOUNDS_FILE.matcher(relative).matches();
+    }
+
+    @SuppressWarnings("unchecked")
+    private void mergeJsonFile(String relative, File targetFile, File sourceFile) throws IOException {
+        Map<String, Object> higher = readJsonFile(sourceFile);
+        Map<String, Object> lower = readJsonFile(targetFile);
+        if (higher == null || lower == null) {
+            // One side is not a JSON object; fall back to plain replacement
+            FileUtils.copyFile(sourceFile, targetFile);
+            return;
+        }
+
+        if (LANG_FILE.matcher(relative).matches()) {
+            lower.putAll(higher);
+        } else if (ATLAS_FILE.matcher(relative).matches()) {
+            List<Object> sources = new ArrayList<>(asList(lower.get("sources")));
+            for (Object source : asList(higher.get("sources"))) {
+                if (!sources.contains(source)) {
+                    sources.add(source);
+                }
+            }
+            lower.putAll(higher);
+            lower.put("sources", sources);
+        } else {
+            // sounds.json: events add their sounds to lower packs' events unless they set "replace"
+            for (Map.Entry<String, Object> event : higher.entrySet()) {
+                Object existing = lower.get(event.getKey());
+                if (!(event.getValue() instanceof Map<?, ?> higherEvent) || !(existing instanceof Map<?, ?> lowerEvent)
+                        || Boolean.TRUE.equals(higherEvent.get("replace"))) {
+                    lower.put(event.getKey(), event.getValue());
+                    continue;
+                }
+                Map<String, Object> combined = new LinkedHashMap<>((Map<String, Object>) lowerEvent);
+                combined.putAll((Map<String, Object>) higherEvent);
+                List<Object> sounds = new ArrayList<>(asList(lowerEvent.get("sounds")));
+                sounds.addAll(asList(higherEvent.get("sounds")));
+                combined.put("sounds", sounds);
+                lower.put(event.getKey(), combined);
+            }
+        }
+
+        writeJsonFile(targetFile, lower);
+    }
+
+    private static List<?> asList(Object value) {
+        return value instanceof List<?> list ? list : List.of();
+    }
+
+    /**
+     * Writes the merged pack.mcmeta: the top pack's metadata, with a format range covering every input pack
+     * and the server's own version, and the overlays/language/filter sections of all inputs combined.
+     */
+    @SuppressWarnings("unchecked")
+    private void writePackMeta(File packDir, List<Map<String, Object>> metas) throws IOException {
+        Map<String, Object> mcmeta = metas.isEmpty() ? new LinkedHashMap<>() : new LinkedHashMap<>(metas.get(metas.size() - 1));
+
+        Map<String, Object> pack = mcmeta.get("pack") instanceof Map<?, ?> p
+            ? new LinkedHashMap<>((Map<String, Object>) p) : new LinkedHashMap<>();
+        mcmeta.put("pack", pack);
+
+        PackFormats.Range range = null;
+        List<Object> overlays = new ArrayList<>();
+        Set<Object> overlayDirs = new HashSet<>();
+        Map<String, Object> languages = new LinkedHashMap<>();
+        List<Object> filters = new ArrayList<>();
+        for (Map<String, Object> meta : metas) {
+            Object section = meta.get("pack");
+            if (section instanceof Map<?, ?> packSection) {
+                PackFormats.Range declared = PackFormats.readRange((Map<String, Object>) packSection);
+                if (declared != null) {
+                    range = range == null ? declared : range.span(declared);
+                }
+            }
+            if (meta.get("overlays") instanceof Map<?, ?> o) {
+                for (Object entry : asList(o.get("entries"))) {
+                    Object dir = entry instanceof Map<?, ?> e ? e.get("directory") : entry;
+                    if (overlayDirs.add(dir)) {
+                        overlays.add(entry);
+                    }
+                }
+            }
+            if (meta.get("language") instanceof Map<?, ?> l) {
+                languages.putAll((Map<String, Object>) l);
+            }
+            if (meta.get("filter") instanceof Map<?, ?> f) {
+                for (Object block : asList(f.get("block"))) {
+                    if (!filters.contains(block)) {
+                        filters.add(block);
+                    }
+                }
+            }
+        }
+        if (!overlays.isEmpty()) {
+            mcmeta.put("overlays", Map.of("entries", overlays));
+        }
+        if (!languages.isEmpty()) {
+            mcmeta.put("language", languages);
+        }
+        if (!filters.isEmpty()) {
+            mcmeta.put("filter", Map.of("block", filters));
+        }
+
+        PackFormats.Version server = PackFormats.currentResourceFormat();
+        if (server != null) {
+            PackFormats.Range serverRange = new PackFormats.Range(server, server);
+            range = range == null ? serverRange : range.span(serverRange);
+        }
+        if (range == null) {
+            range = new PackFormats.Range(new PackFormats.Version(34, 0), new PackFormats.Version(34, 0));
+            logger.warning("Could not determine a pack format for the merged pack; defaulting to 34 (1.21)");
+        }
+        PackFormats.writeRange(pack, range);
+        pack.put("description", "Merged Resource Pack");
+
+        logger.info("Merged pack declares formats " + range + (server != null ? " (server uses " + server + ")" : ""));
+        writeJsonFile(new File(packDir, MCMETA), mcmeta);
+    }
+
+    private Map<String, Object> readJsonFile(File file) {
+        if (!file.isFile()) {
+            return null;
+        }
         try {
-            return mapper.readValue(file, new TypeReference<Map<String, Object>>() {
+            return mapper.readValue(file, new TypeReference<LinkedHashMap<String, Object>>() {
             });
         } catch (IOException e) {
             logger.warning("Failed to read JSON file " + file.getName() + ": " + e.getMessage());
@@ -308,7 +363,7 @@ public class ResourcePackMerger {
         }
     }
 
-    private void writeJsonFile(File file, Map<String, Object> content, ObjectMapper mapper) throws IOException {
+    private void writeJsonFile(File file, Map<String, Object> content) throws IOException {
         File tempFile = new File(file.getParentFile(), file.getName() + ".tmp");
         try {
             file.getParentFile().mkdirs();
@@ -321,134 +376,28 @@ public class ResourcePackMerger {
     }
 
     private void zipDirectory(File sourceDir, File zipFile) throws IOException {
+        List<Path> files;
+        try (Stream<Path> walk = Files.walk(sourceDir.toPath())) {
+            files = walk.filter(path -> !Files.isDirectory(path)).sorted().toList();
+        }
         try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(zipFile))) {
-            Files.walk(sourceDir.toPath())
-                    .filter(path -> !Files.isDirectory(path))
-                    .forEach(path -> {
-                        ZipEntry zipEntry = new ZipEntry(
-                                sourceDir.toPath().relativize(path).toString().replace('\\', '/'));
-                        try {
-                            zos.putNextEntry(zipEntry);
-                            Files.copy(path, zos);
-                            zos.closeEntry();
-                        } catch (IOException e) {
-                            logger.warning("Failed to add file to zip: " + path);
-                        }
-                    });
-        }
-    }
-
-    private int getPackFormat() {
-        String version = plugin.getServer().getBukkitVersion();
-
-        // Use Regex to find the version number (e.g., 1.20.4) safely in any string
-        // Matches 1.20, 1.20.4, 1.20.4-rc1, etc.
-        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("(\\d+\\.\\d+(\\.\\d+)?)");
-        java.util.regex.Matcher matcher = pattern.matcher(version);
-
-        if (matcher.find()) {
-            version = matcher.group(1);
-        } else {
-            // Fallback: Try getVersion() which might be "git-Paper-123 (MC: 1.20.4)"
-            String serverVersion = plugin.getServer().getVersion();
-            matcher = pattern.matcher(serverVersion);
-            if (matcher.find()) {
-                version = matcher.group(1);
-            } else {
-                logger.warning("Could not determine server version from: '" + version + "' or '" + serverVersion
-                        + "'. Defaulting to 1.21 pack format.");
-                // Default to 1.21 logic if we fail completely
-                return 34;
+            for (Path path : files) {
+                zos.putNextEntry(new ZipEntry(sourceDir.toPath().relativize(path).toString().replace('\\', '/')));
+                Files.copy(path, zos);
+                zos.closeEntry();
             }
         }
-
-        // Map Minecraft versions to pack_format numbers
-        // See https://minecraft.wiki/w/Pack_format
-        return switch (version) {
-            case "1.21.2", "1.21.3" -> 42;
-            case "1.21", "1.21.1" -> 34;
-            case "1.20.5", "1.20.6" -> 32;
-            case "1.20.3", "1.20.4" -> 22;
-            case "1.20.2" -> 18;
-            case "1.20", "1.20.1" -> 15;
-            case "1.19.4" -> 13;
-            case "1.19.3" -> 12;
-            case "1.19.1", "1.19.2" -> 9;
-            case "1.18.2" -> 8;
-            case "1.18", "1.18.1" -> 7;
-            case "1.17", "1.17.1" -> 7;
-            case "1.16.2", "1.16.3", "1.16.4", "1.16.5" -> 6;
-            case "1.16", "1.16.1" -> 5;
-            case "1.15", "1.15.1", "1.15.2" -> 5;
-            case "1.14", "1.14.1", "1.14.2", "1.14.3", "1.14.4" -> 4;
-            case "1.13", "1.13.1", "1.13.2" -> 4;
-            default -> {
-                // For unknown versions, try to make an educated guess
-                String[] parts = version.split("\\.");
-                if (parts.length >= 2) {
-                    try {
-                        int major = Integer.parseInt(parts[1]);
-                        if (major >= 21) { // Future versions
-                            yield 34;
-                        } else if (major >= 20) {
-                            yield 15;
-                        }
-                    } catch (NumberFormatException ignored) {
-                    }
-                }
-                // Default to latest known format if we can't determine version
-                yield 34;
-            }
-        };
-    }
-
-    private void updatePackMeta(File packDir) throws IOException {
-        File mcmetaFile = new File(packDir, "pack.mcmeta");
-        ObjectMapper mapper = new ObjectMapper();
-
-        Map<String, Object> mcmeta;
-        if (mcmetaFile.exists()) {
-            mcmeta = readJsonFile(mcmetaFile, mapper);
-            if (mcmeta == null) {
-                mcmeta = new HashMap<>();
-            }
-        } else {
-            mcmeta = new HashMap<>();
-        }
-
-        Object packObj = mcmeta.computeIfAbsent("pack", k -> new HashMap<>());
-        Map<String, Object> pack;
-        if (packObj instanceof Map<?, ?> mapObj) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> safePack = (Map<String, Object>) mapObj;
-            pack = safePack;
-        } else {
-            pack = new HashMap<>();
-            mcmeta.put("pack", pack);
-        }
-
-        // Use the server's version to determine pack format
-        int packFormat = getPackFormat();
-        pack.put("pack_format", packFormat);
-        pack.put("description", "Merged Resource Pack (Format: " + packFormat + ")");
-
-        logger.info("Setting merged pack format to " + packFormat + " for server version " +
-                plugin.getServer().getBukkitVersion());
-
-        writeJsonFile(mcmetaFile, mcmeta, mapper);
     }
 
     private void cleanup(File workDir) {
-        CompletableFuture.runAsync(() -> {
-            try {
-                if (workDir != null && workDir.exists()) {
-                    FileUtils.deleteDirectory(workDir);
-                }
-            } catch (IOException e) {
-                logger.warning("Failed to clean up temporary directory: " + e.getMessage());
-            } finally {
-                pendingCleanup.remove(workDir);
+        try {
+            if (workDir != null && workDir.exists()) {
+                FileUtils.deleteDirectory(workDir);
             }
-        }, executor);
+        } catch (IOException e) {
+            logger.warning("Failed to clean up temporary directory: " + e.getMessage());
+        } finally {
+            pendingCleanup.remove(workDir);
+        }
     }
 }

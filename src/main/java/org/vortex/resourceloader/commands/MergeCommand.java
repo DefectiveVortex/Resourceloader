@@ -7,6 +7,7 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.util.StringUtil;
 import org.vortex.resourceloader.Resourceloader;
 import org.vortex.resourceloader.ResourcePackMerger;
+import org.vortex.resourceloader.core.ResourcePackManager;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -40,7 +41,8 @@ public class MergeCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        final String outputName = args[0].toLowerCase().endsWith(".zip") ? args[0] : args[0] + ".zip";
+        // Same name the pack will be registered under, and never a path outside the packs folder
+        final String outputName = ResourcePackManager.sanitizePackName(args[0]) + ".zip";
 
         // Check if output pack already exists
         File outputFile = new File(plugin.getPackManager().getResolvedResourcePackDirectory(), outputName);
@@ -53,7 +55,8 @@ public class MergeCommand implements CommandExecutor, TabCompleter {
         List<File> packsToMerge = new ArrayList<>();
         for (int i = 1; i < args.length; i++) {
             String packName = args[i];
-            File packFile = plugin.getResourcePacks().get(packName);
+            String packKey = plugin.getPackManager().findPackKey(packName);
+            File packFile = packKey == null ? null : plugin.getResourcePacks().get(packKey);
             if (packFile == null || !packFile.exists()) {
                 sender.sendMessage(plugin.getMessageManager().formatMessage("merge.invalid-pack",
                     "pack", packName));
@@ -71,8 +74,8 @@ public class MergeCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(plugin.getMessageManager().getMessage("merge.started"));
 
         plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            ResourcePackMerger merger = new ResourcePackMerger(plugin);
             try {
-                ResourcePackMerger merger = new ResourcePackMerger(plugin);
                 File result = merger.mergeResourcePacks(packsToMerge, outputName);
 
                 plugin.getServer().getScheduler().runTask(plugin, () -> {
@@ -91,6 +94,8 @@ public class MergeCommand implements CommandExecutor, TabCompleter {
                         "error", e.getMessage()));
                     isMerging.set(false);
                 });
+            } finally {
+                merger.shutdown();
             }
         });
 

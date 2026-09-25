@@ -7,9 +7,7 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.bukkit.util.StringUtil;
 import org.vortex.resourceloader.Resourceloader;
-import org.vortex.resourceloader.util.FileUtil;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -38,7 +36,7 @@ public class AutoLoadCommand implements CommandExecutor, TabCompleter {
             if (preferences.isEmpty()) {
                 player.sendMessage(plugin.getMessageManager().getMessage("autoload.no-preference"));
             } else {
-                player.sendMessage(plugin.getMessageManager().formatMessage("autoload.current-preference", 
+                player.sendMessage(plugin.getMessageManager().formatMessage("autoload.current-preference",
                     "pack", preferences.get(0)));
             }
             return true;
@@ -50,31 +48,23 @@ public class AutoLoadCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        String packName = args[0].toLowerCase();
-        if (!plugin.getResourcePacks().containsKey(packName)) {
-            player.sendMessage(plugin.getMessageManager().formatMessage("general.invalid-pack", 
-                "pack", packName));
+        String packName = plugin.getPackManager().findPackKey(args[0]);
+        if (packName == null) {
+            player.sendMessage(plugin.getMessageManager().formatMessage("general.invalid-pack",
+                "pack", args[0]));
             return true;
         }
 
-        // Set preference and immediately apply the pack
+        // Set preference and immediately apply the pack (local file or URL)
         plugin.getPackManager().setPlayerPreference(player.getUniqueId(), packName);
-        
-        // Apply the pack immediately
-        File packFile = plugin.getResourcePacks().get(packName);
-        if (packFile != null && packFile.exists()) {
-            try {
-                String downloadUrl = plugin.getPackManager().getPackServer().createDownloadURL(player, packName, packFile.getName());
-                byte[] hash = FileUtil.calcSHA1(packFile);
-                player.setResourcePack(downloadUrl, hash);
-                player.sendMessage(plugin.getMessageManager().formatMessage("autoload.set", 
-                    "pack", packName));
-            } catch (Exception e) {
-                player.sendMessage(plugin.getMessageManager().formatMessage("autoload.set-failed", 
-                    "pack", packName, "error", e.getMessage()));
-                plugin.getLogger().warning("Failed to apply resource pack for " + player.getName() + ": " + e.getMessage());
-            }
-        }
+        player.sendMessage(plugin.getMessageManager().formatMessage("autoload.set", "pack", packName));
+
+        plugin.getPackManager().sendPack(player, packName, false).exceptionally(e -> {
+            player.sendMessage(plugin.getMessageManager().formatMessage("autoload.set-failed",
+                "pack", packName, "error", String.valueOf(e.getMessage())));
+            plugin.getLogger().warning("Failed to apply resource pack for " + player.getName() + ": " + e.getMessage());
+            return null;
+        });
 
         return true;
     }
@@ -94,4 +84,4 @@ public class AutoLoadCommand implements CommandExecutor, TabCompleter {
         Collections.sort(completions);
         return completions;
     }
-} 
+}

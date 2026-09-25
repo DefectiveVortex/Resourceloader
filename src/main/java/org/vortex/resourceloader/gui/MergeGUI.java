@@ -9,6 +9,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -99,7 +100,11 @@ public class MergeGUI implements Listener {
     }
 
     private ItemStack createPackItem(String name, File file) {
-        ItemStack item = new ItemStack(Material.BOOK);
+        return createPackItem(name, file, false);
+    }
+
+    private ItemStack createPackItem(String name, File file, boolean selected) {
+        ItemStack item = new ItemStack(selected ? Material.ENCHANTED_BOOK : Material.BOOK);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
             meta.setDisplayName(ChatColor.GOLD + name);
@@ -108,7 +113,7 @@ public class MergeGUI implements Listener {
             lore.add(messages().formatMessageNoPrefix("gui.pack-file", "file", file.getName()));
             lore.add(messages().formatMessageNoPrefix("gui.pack-size", "size", formatFileSize(file.length())));
             lore.add("");
-            lore.add(messages().getMessageNoPrefix("gui.click-to-select"));
+            lore.add(messages().getMessageNoPrefix(selected ? "gui.selected" : "gui.click-to-select"));
             
             meta.setLore(lore);
             item.setItemMeta(meta);
@@ -141,6 +146,8 @@ public class MergeGUI implements Listener {
         if (mergeInventory == null || !mergeInventory.equals(event.getInventory())) return;
 
         event.setCancelled(true);
+        // Clicks in the player's own inventory must not act as GUI buttons
+        if (!mergeInventory.equals(event.getClickedInventory())) return;
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta() || clicked.getItemMeta() == null) return;
 
@@ -162,24 +169,18 @@ public class MergeGUI implements Listener {
 
     private void handlePackSelection(Player player, InventoryClickEvent event, ItemStack clicked, List<String> selectedList) {
         String packName = ChatColor.stripColor(clicked.getItemMeta().getDisplayName());
-        if (selectedList.contains(packName)) {
-            selectedList.remove(packName);
-            clicked.setType(Material.BOOK);
-            player.playSound(player.getLocation(), SELECT_SOUND, 1.0f, 0.8f);
-        } else {
+        File packFile = plugin.getResourcePacks().get(packName);
+        if (packFile == null) return;
+
+        boolean selected = !selectedList.contains(packName);
+        if (selected) {
             selectedList.add(packName);
-            clicked.setType(Material.ENCHANTED_BOOK);
-            player.playSound(player.getLocation(), SELECT_SOUND, 1.0f, 1.2f);
+        } else {
+            selectedList.remove(packName);
         }
-        event.getInventory().setItem(event.getSlot(), clicked);
-        
-        // Update item lore with selection status
-        ItemMeta meta = clicked.getItemMeta();
-        List<String> lore = meta.getLore();
-        lore.set(lore.size() - 1, messages().getMessageNoPrefix(
-            selectedList.contains(packName) ? "gui.selected" : "gui.click-to-select"));
-        meta.setLore(lore);
-        clicked.setItemMeta(meta);
+        // Replace the item rather than editing the clicked stack, which may be a detached copy
+        event.getInventory().setItem(event.getSlot(), createPackItem(packName, packFile, selected));
+        player.playSound(player.getLocation(), SELECT_SOUND, 1.0f, selected ? 1.2f : 0.8f);
     }
 
     private void handleMergeAction(Player player, List<String> selectedList, String outputName) {
@@ -201,6 +202,14 @@ public class MergeGUI implements Listener {
         }
         player.playSound(player.getLocation(), SELECT_SOUND, 1.0f, 1.0f);
         previewMerge(player, selectedList);
+    }
+
+    @EventHandler
+    public void onInventoryDrag(InventoryDragEvent event) {
+        Inventory mergeInventory = openInventories.get(event.getWhoClicked().getUniqueId());
+        if (mergeInventory != null && mergeInventory.equals(event.getInventory())) {
+            event.setCancelled(true);
+        }
     }
 
     @EventHandler
