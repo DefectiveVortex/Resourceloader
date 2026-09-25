@@ -1,0 +1,164 @@
+# ResourceLoader 消息（简体中文）
+# 在 config.yml 中设置 language: "zh" 即可启用。
+# 使用 & 表示颜色代码（例如 &a 为绿色，&c 为红色）
+# %player% 玩家名称
+# %pack% 资源包名称
+# %size% 文件大小
+# %current% 和 %total% 进度数字
+# 请勿翻译 %...% 占位符和命令名称。
+
+prefix: "&7[&eResourceLoader&7] &r"
+
+general:
+  no-permission: "&c你没有权限使用此命令。"
+  reload-success: "&a配置已成功重新加载！"
+  reload-failed: "&c重新加载配置失败：%error%"
+  invalid-pack: "&c未找到资源包 '%pack%'！"
+  players-only: "&c此命令只能由玩家使用。"
+
+help:
+  header: "&6=== ResourceLoader 帮助 ==="
+  load: "&e/load [pack] &7- 加载资源包"
+  load-specific: "&e/load <pack> &7- 加载指定的资源包"
+  list: "&e/packlist &7- 列出可用的资源包"
+  autoload: "&e/autoload <pack|clear> &7- 设置自动加载资源包"
+  admin-header: "&6=== 管理员命令 ==="
+  merge: "&e/mergepack <output> <pack1> <pack2> &7- 合并资源包"
+  mergegui: "&e/mergegui <output> &7- 打开合并界面"
+  remove: "&e/removepack <pack> &7- 删除资源包"
+  checkpack: "&e/checkpack <pack> &7- 校验资源包"
+  reload: "&e/resourcereload &7- 重新加载配置"
+  version: "&e/resourceversion &7- 检查插件版本"
+  cache: "&e/clearcache &7- 清除资源包缓存"
+  footer: "&6=========================="
+
+resource-packs:
+  loading: "&e正在加载资源包 %pack%..."
+  load-success: "&a资源包加载成功！"
+  load-failed: "&c资源包加载失败：%error%"
+  download-started: "&e正在下载资源包..."
+  download-success: "&a资源包已下载，正在应用..."
+  download-failed: "&c资源包下载失败，请重试。"
+  invalid-url: "&c资源包 URL 无效，请联系管理员。"
+  already-loading: "&c正在加载资源包，请稍候..."
+  no-default: "&c未配置默认资源包。"
+  not-found: "&c未找到资源包 '%pack%'。"
+  file-not-found: "&c未找到资源包文件。"
+  invalid-path: "&c资源包 '%pack%' 的路径无效。"
+  invalid-pack: "&c未找到资源包！"
+
+list:
+  header: "&6=== 可用的资源包 ==="
+  no-packs: "&7没有可用的资源包。"
+  default-pack: "&7默认资源包：&f%type%"
+  pack-entry: "&7• &f%pack%"
+  type-url: "URL"
+  type-file: "文件"
+  footer: "&6==========================="
+
+autoload:
+  no-preference: "&e你还没有设置首选资源包。"
+  current-preference: "&e你当前的首选资源包：&6%pack%"
+  set: "&a已将 &6%pack% &a设为你的首选资源包。"
+  set-failed: "&c应用资源包 &6%pack% &c失败：%error%"
+  cleared: "&a已清除你的资源包偏好设置。"
+  loaded: "&a已自动加载你的首选资源包：&6%pack%"
+
+merge:
+  started: "&7开始合并资源包..."
+  progress: "&7正在合并资源包 &e%current%&7/&e%total%"
+  success: "&a资源包已成功合并为：&e%pack%"
+  failed: "&c合并资源包失败：%error%"
+  already-merging: "&c已有合并操作正在进行，请稍候。"
+  invalid-usage: "&c用法：/mergepack <output_name> <pack1> <pack2> [pack3...]"
+  no-packs: "&c至少需要指定两个资源包才能合并！"
+  invalid-pack: "&c未找到资源包 '%pack%'！"
+  output-exists: "&c名为 '%pack%' 的资源包已存在！"
+
+remove:
+  usage: "&c用法：/removepack <packname>"
+  not-found: "&c未找到资源包 '%pack%'！"
+  failed: "&c删除资源包 '%pack%' 失败！"
+  success: "&a已成功删除资源包 '%pack%'！"
+
+checkpack:
+  usage: "&c用法：/checkpack <packname>"
+  not-found: "&c配置中未找到资源包 '%pack%'。"
+  url-pack: "&e正在校验 URL 资源包：%pack%"
+  url-note: "&7注意：URL 资源包会在下载时进行校验。如需详细校验，请对本地文件使用此命令。"
+  file-not-found: "&c未找到资源包文件：%file%"
+  validating: "&e正在校验资源包：&f%pack%"
+  file: "&7文件：%file%"
+  success: "&a✓ 资源包校验通过！"
+  failed: "&c✗ 资源包校验失败！"
+
+cache:
+  cleared: "&a资源包缓存已清除！"
+  using-cached: "&7正在使用 %pack% 的缓存版本"
+  downloading-new: "&7正在下载 %pack% 的新版本"
+
+updates:
+  available: "&e有新版本可用！当前：&c%current%&e，最新：&a%latest%"
+  check-command: "&e使用 &f/resourceversion check &e查看更多信息。"
+  checking: "&e正在检查更新..."
+  current-version: "&e当前版本：&f%version%"
+  latest-version: "&e最新版本：&f%version%"
+  up-to-date: "&a你正在使用最新版本！"
+  new-version: "&a有新版本可用！"
+  download: "&e下载地址：&f%url%"
+  check-failed: "&c检查更新失败。"
+  parse-failed: "&c解析版本信息失败。"
+  http-error: "&c检查更新失败。HTTP %code%"
+  check-error: "&c检查更新失败：%error%"
+
+gui:
+  title: "&5资源包合并"
+  preview-title: "资源包预览：%pack%"
+  select-packs: "&e选择要合并的资源包"
+  conflict-detected: "&e检测到冲突：%file%"
+  resolve-prompt: "&e你希望如何解决此冲突？"
+  loading-preview: "&e正在准备预览..."
+  usage: "&c用法：/mergegui <output_name>"
+  disabled: "&c配置中已禁用界面功能。"
+  too-many-packs: "&c资源包过多，无法在界面中显示。最多：%max%"
+  open-failed: "&c打开合并界面失败，请重试。"
+  pack-file: "&7文件：%file%"
+  pack-size: "&7大小：%size%"
+  click-to-select: "&e点击选择/取消选择"
+  selected: "&e✓ 已选择"
+  merge-button: "&6合并所选资源包"
+  merge-button-lore: "&7点击合并所选资源包"
+  output-lore: "&7输出：%pack%"
+  preview-button: "&6预览合并"
+  preview-button-lore: "&7点击预览合并后的资源包"
+  cancel-button: "&6取消"
+  cancel-button-lore: "&7点击取消合并"
+  cancelled: "&c合并操作已取消。"
+  select-more-merge: "&c请至少选择 2 个资源包进行合并！"
+  select-more-preview: "&c请至少选择 2 个资源包进行预览！"
+  not-enough-valid: "&c错误：所选的有效资源包不足！"
+  merging: "&e正在合并 %count% 个资源包..."
+  merge-failed: "&c合并资源包失败，请重试。"
+  preview-header: "&e已选择合并的资源包："
+  preview-entry: "&7- %pack% (%size%)"
+  preview-total: "&e总大小：%size%"
+  preview-hint: "&e使用合并按钮来合并这些资源包。"
+  preview-failed: "&c生成预览失败，请重试。"
+
+backup:
+  created: "&a已创建备份：%file%"
+  failed: "&c创建备份失败：%error%"
+  cleaned: "&7已清理旧备份：%file%"
+
+statistics:
+  recorded: "&7已记录资源包使用情况：%pack%"
+  preference-saved: "&7已保存 %player% 的资源包偏好"
+
+enforcement:
+  declined: "&c你必须接受资源包才能在此服务器上游玩！"
+  failed: "&c资源包下载失败，请重新加入服务器！"
+  retry: "&e将在 %seconds% 秒后重试下载资源包..."
+  restricted-command: "&c在资源包加载完成前，你无法使用此命令。"
+
+kick:
+  declined: "&c你必须接受资源包才能在此服务器上游玩！"

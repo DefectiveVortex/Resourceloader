@@ -1,6 +1,12 @@
 # ResourceLoader Configuration
 # For detailed documentation, visit: https://github.com/DefectiveVortex/Resourceloader
 
+# Language used for chat messages, kick messages and the merge GUI
+# Supported: en (English), ru (Russian), tr (Turkish), ko (Korean), zh (Simplified Chinese)
+# Translated messages are saved to plugins/Resourceloader/lang/messages_<code>.yml
+# and can be edited there. English messages live in messages.yml.
+language: "en"
+
 #====================#
 # Resource Packs     #
 #====================#
@@ -12,6 +18,8 @@
 server-pack: ""
 
 # Individual resource pack definitions
+# Every entry MUST be indented under "resource-packs:" (two spaces), otherwise it is ignored.
+# Pack files go in plugins/Resourceloader/packs/ (or storage.resource-pack-directory).
 # Format:
 #   packname: "filename.zip"    # For local files
 #   packname: "https://..."    # For external URLs

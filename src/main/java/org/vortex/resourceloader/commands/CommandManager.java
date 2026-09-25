@@ -5,6 +5,8 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.vortex.resourceloader.Resourceloader;
 import org.vortex.resourceloader.util.ConfigFileUpdater;
+import org.vortex.resourceloader.util.ConfigRepair;
+import org.vortex.resourceloader.util.MessageManager;
 
 
 public class CommandManager {
@@ -57,40 +59,42 @@ public class CommandManager {
     }
 
     private static class HelpCommand implements CommandExecutor {
+        private final Resourceloader plugin;
 
         public HelpCommand(Resourceloader plugin) {
-            // Constructor for consistency
+            this.plugin = plugin;
         }
 
         @Override
         public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-            sender.sendMessage("§6=== ResourceLoader Help ===");
+            MessageManager messages = plugin.getMessageManager();
+            sender.sendMessage(messages.getMessageNoPrefix("help.header"));
 
             if (sender.hasPermission("resourceloader.load")) {
-                sender.sendMessage("§e/load [pack] §7- Load a resource pack");
-                sender.sendMessage("§e/load <pack> §7- Load a specific resource pack");
+                sender.sendMessage(messages.getMessageNoPrefix("help.load"));
+                sender.sendMessage(messages.getMessageNoPrefix("help.load-specific"));
             }
 
             if (sender.hasPermission("resourceloader.list")) {
-                sender.sendMessage("§e/listpacks §7- List available resource packs");
+                sender.sendMessage(messages.getMessageNoPrefix("help.list"));
             }
 
             if (sender.hasPermission("resourceloader.autoload")) {
-                sender.sendMessage("§e/autoload <pack|clear> §7- Set automatic pack loading");
+                sender.sendMessage(messages.getMessageNoPrefix("help.autoload"));
             }
 
             if (sender.hasPermission("resourceloader.admin")) {
-                sender.sendMessage("§6=== Admin Commands ===");
-                sender.sendMessage("§e/mergepack <output> <pack1> <pack2> §7- Merge resource packs");
-                sender.sendMessage("§e/mergegui §7- Open merge GUI");
-                sender.sendMessage("§e/removepack <pack> §7- Remove a resource pack");
-                sender.sendMessage("§e/checkpack <pack> §7- Validate a resource pack");
-                sender.sendMessage("§e/resourcereload §7- Reload configuration");
-                sender.sendMessage("§e/resourceversion §7- Check plugin version");
-                sender.sendMessage("§e/clearcache §7- Clear resource pack cache");
+                sender.sendMessage(messages.getMessageNoPrefix("help.admin-header"));
+                sender.sendMessage(messages.getMessageNoPrefix("help.merge"));
+                sender.sendMessage(messages.getMessageNoPrefix("help.mergegui"));
+                sender.sendMessage(messages.getMessageNoPrefix("help.remove"));
+                sender.sendMessage(messages.getMessageNoPrefix("help.checkpack"));
+                sender.sendMessage(messages.getMessageNoPrefix("help.reload"));
+                sender.sendMessage(messages.getMessageNoPrefix("help.version"));
+                sender.sendMessage(messages.getMessageNoPrefix("help.cache"));
             }
 
-            sender.sendMessage("§6==========================");
+            sender.sendMessage(messages.getMessageNoPrefix("help.footer"));
             return true;
         }
     }
@@ -111,6 +115,7 @@ public class CommandManager {
 
             try {
                 ConfigFileUpdater.updateBundledConfigs(plugin);
+                ConfigRepair.repair(plugin);
                 plugin.reloadConfig();
                 plugin.getMessageManager().reloadMessages();
                 plugin.loadResourcePacks(true);
@@ -168,14 +173,16 @@ public class CommandManager {
 
             String serverPack = plugin.getConfig().getString("server-pack");
             if (serverPack != null && !serverPack.isEmpty()) {
-                String packType = serverPack.startsWith("http") ? "URL" : "File";
+                String packType = plugin.getMessageManager().getMessageNoPrefix(
+                    serverPack.startsWith("http") ? "list.type-url" : "list.type-file");
                 sender.sendMessage(plugin.getMessageManager().formatMessage("list.default-pack",
                     "type", packType));
             }
 
             plugin.getResourcePacks().forEach((name, file) -> {
                 if (!name.equals("server")) {
-                    String packType = file == null ? "URL" : "File";
+                    String packType = plugin.getMessageManager().getMessageNoPrefix(
+                        file == null ? "list.type-url" : "list.type-file");
                     sender.sendMessage(plugin.getMessageManager().formatMessage("list.pack-entry",
                         "pack", name, "type", packType));
                 }
@@ -200,8 +207,9 @@ public class CommandManager {
                 return true;
             }
 
+            MessageManager messages = plugin.getMessageManager();
             String currentVersion = plugin.getDescription().getVersion();
-            sender.sendMessage("§eChecking for updates...");
+            sender.sendMessage(messages.getMessage("updates.checking"));
 
             // Use async task to check for updates
             plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
@@ -239,29 +247,35 @@ public class CommandManager {
                         final String finalLatestVersion = latestVersion;
                         plugin.getServer().getScheduler().runTask(plugin, () -> {
                             if (finalLatestVersion != null) {
-                                sender.sendMessage("§eCurrent version: §f" + currentVersion);
-                                sender.sendMessage("§eLatest version: §f" + finalLatestVersion);
+                                sender.sendMessage(messages.formatMessageNoPrefix("updates.current-version",
+                                    "version", currentVersion));
+                                sender.sendMessage(messages.formatMessageNoPrefix("updates.latest-version",
+                                    "version", finalLatestVersion));
 
                                 if (!currentVersion.equals(finalLatestVersion)) {
-                                    sender.sendMessage("§aA new version is available!");
-                                    sender.sendMessage("§eDownload it from: §fhttps://github.com/DefectiveVortex/Resourceloader/releases/latest");
+                                    sender.sendMessage(messages.getMessageNoPrefix("updates.new-version"));
+                                    sender.sendMessage(messages.formatMessageNoPrefix("updates.download",
+                                        "url", "https://github.com/DefectiveVortex/Resourceloader/releases/latest"));
                                 } else {
-                                    sender.sendMessage("§aYou are running the latest version!");
+                                    sender.sendMessage(messages.getMessageNoPrefix("updates.up-to-date"));
                                 }
                             } else {
-                                sender.sendMessage("§cFailed to parse version information.");
+                                sender.sendMessage(messages.getMessage("updates.parse-failed"));
                             }
                         });
                     } else {
                         final int responseCode = conn.getResponseCode();
                         plugin.getServer().getScheduler().runTask(plugin, () -> {
-                            sender.sendMessage("§cFailed to check for updates. HTTP " + responseCode);
+                            sender.sendMessage(messages.formatMessage("updates.http-error",
+                                "code", responseCode));
                         });
                     }
                 } catch (Exception e) {
                     plugin.getServer().getScheduler().runTask(plugin, () -> {
-                        sender.sendMessage("§cFailed to check for updates: " + e.getMessage());
-                        sender.sendMessage("§eCurrent version: §f" + currentVersion);
+                        sender.sendMessage(messages.formatMessage("updates.check-error",
+                            "error", String.valueOf(e.getMessage())));
+                        sender.sendMessage(messages.formatMessageNoPrefix("updates.current-version",
+                            "version", currentVersion));
                     });
                 }
             });

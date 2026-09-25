@@ -6,6 +6,7 @@ import org.vortex.resourceloader.core.ResourcePackManager;
 import org.vortex.resourceloader.compression.PackCompressor;
 import org.vortex.resourceloader.gui.MergeGUI;
 import org.vortex.resourceloader.util.ConfigFileUpdater;
+import org.vortex.resourceloader.util.ConfigRepair;
 import org.vortex.resourceloader.util.MessageManager;
 import org.vortex.resourceloader.commands.CommandManager;
 import org.vortex.resourceloader.listeners.ResourcePackEnforcer;
@@ -27,6 +28,7 @@ public final class Resourceloader extends JavaPlugin {
 
         // Repair bundled config files before any manager reads them
         ConfigFileUpdater.updateBundledConfigs(this);
+        ConfigRepair.repair(this);
         reloadConfig();
 
         messageManager = new MessageManager(this);

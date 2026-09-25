@@ -1,6 +1,5 @@
 package org.vortex.resourceloader.commands;
 
-import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -17,17 +16,17 @@ public class MergeGUICommand implements CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player)) {
-            sender.sendMessage(ChatColor.RED + "This command can only be used by players.");
+            sender.sendMessage(plugin.getMessageManager().getMessage("general.players-only"));
             return true;
         }
 
         if (!sender.hasPermission("resourceloader.admin")) {
-            sender.sendMessage(ChatColor.RED + "You don't have permission to use the resource pack merger.");
+            sender.sendMessage(plugin.getMessageManager().getMessage("general.no-permission"));
             return true;
         }
 
         if (args.length < 1) {
-            sender.sendMessage(ChatColor.RED + "Usage: /mergegui <output_name>");
+            sender.sendMessage(plugin.getMessageManager().getMessage("gui.usage"));
             return true;
         }
 
@@ -37,7 +36,7 @@ public class MergeGUICommand implements CommandExecutor {
         }
 
         if (!plugin.getConfig().getBoolean("gui.enabled", true)) {
-            sender.sendMessage(ChatColor.RED + "The GUI feature is disabled in the configuration.");
+            sender.sendMessage(plugin.getMessageManager().getMessage("gui.disabled"));
             return true;
         }
 

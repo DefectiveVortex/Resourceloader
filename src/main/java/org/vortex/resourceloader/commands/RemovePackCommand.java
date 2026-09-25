@@ -4,6 +4,7 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.util.StringUtil;
 import org.vortex.resourceloader.Resourceloader;
 
@@ -27,13 +28,13 @@ public class RemovePackCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length != 1) {
-            sender.sendMessage("§cUsage: /removepack <packname>");
+            sender.sendMessage(plugin.getMessageManager().getMessage("remove.usage"));
             return true;
         }
 
         String packName = args[0];
         if (!plugin.getResourcePacks().containsKey(packName)) {
-            sender.sendMessage("§cResource pack '" + packName + "' not found!");
+            sender.sendMessage(plugin.getMessageManager().formatMessage("remove.not-found", "pack", packName));
             return true;
         }
 
@@ -41,24 +42,27 @@ public class RemovePackCommand implements CommandExecutor, TabCompleter {
         if (packFile != null && packFile.exists()) {
             try {
                 if (!packFile.delete()) {
-                    sender.sendMessage("§cFailed to remove resource pack '" + packName + "'!");
+                    sender.sendMessage(plugin.getMessageManager().formatMessage("remove.failed", "pack", packName));
                     return true;
                 }
             } catch (SecurityException e) {
-                sender.sendMessage("§cFailed to remove resource pack '" + packName + "'!");
+                sender.sendMessage(plugin.getMessageManager().formatMessage("remove.failed", "pack", packName));
                 plugin.getLogger().warning("Failed to delete pack file: " + e.getMessage());
                 return true;
             }
         }
 
         // Remove from config
-        plugin.getConfig().getConfigurationSection("resource-packs").set(packName, null);
+        ConfigurationSection packs = plugin.getConfig().getConfigurationSection("resource-packs");
+        if (packs != null) {
+            packs.set(packName, null);
+        }
         plugin.saveConfig();
 
         // Remove from memory
         plugin.getResourcePacks().remove(packName);
         
-        sender.sendMessage("§aSuccessfully removed resource pack '" + packName + "'!");
+        sender.sendMessage(plugin.getMessageManager().formatMessage("remove.success", "pack", packName));
         return true;
     }
 

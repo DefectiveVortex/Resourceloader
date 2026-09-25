@@ -13,6 +13,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.vortex.resourceloader.Resourceloader;
+import org.vortex.resourceloader.util.MessageManager;
 
 import java.io.File;
 import java.util.*;
@@ -23,7 +24,7 @@ public class MergeGUI implements Listener {
     private final Resourceloader plugin;
     private final Map<UUID, List<String>> selectedPacks;
     private final Map<UUID, String> outputNames;
-    private final Set<UUID> openInventories;
+    private final Map<UUID, Inventory> openInventories;
     private static final int MAX_PACKS = 45; // Maximum number of packs that can be displayed
     private static final Sound SELECT_SOUND = Sound.BLOCK_NOTE_BLOCK_PLING;
     private static final Sound ERROR_SOUND = Sound.BLOCK_NOTE_BLOCK_BASS;
@@ -33,8 +34,12 @@ public class MergeGUI implements Listener {
         this.plugin = plugin;
         this.selectedPacks = new ConcurrentHashMap<>();
         this.outputNames = new ConcurrentHashMap<>();
-        this.openInventories = ConcurrentHashMap.newKeySet();
+        this.openInventories = new ConcurrentHashMap<>();
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
+    }
+
+    private MessageManager messages() {
+        return plugin.getMessageManager();
     }
 
     public void openMergeGUI(Player player, String outputName) {
@@ -51,18 +56,18 @@ public class MergeGUI implements Listener {
 
         // Check if there are too many packs
         if (availablePacks.size() > MAX_PACKS) {
-            player.sendMessage(ChatColor.RED + "Too many resource packs to display in GUI. Maximum: " + MAX_PACKS);
+            player.sendMessage(messages().formatMessage("gui.too-many-packs", "max", MAX_PACKS));
             return;
         }
 
         // Create inventory with appropriate size
         int size = Math.min(54, ((availablePacks.size() / 9) + 1) * 9 + 9);
-        Inventory inv = Bukkit.createInventory(null, size, ChatColor.DARK_PURPLE + "Resource Pack Merger");
+        Inventory inv = Bukkit.createInventory(null, size, messages().getMessageNoPrefix("gui.title"));
 
         // Store player data
         outputNames.put(player.getUniqueId(), outputName);
         selectedPacks.put(player.getUniqueId(), new ArrayList<>());
-        openInventories.add(player.getUniqueId());
+        openInventories.put(player.getUniqueId(), inv);
 
         try {
             // Add available packs
@@ -74,17 +79,21 @@ public class MergeGUI implements Listener {
 
             // Add control buttons at the bottom row
             int bottomRow = size - 9;
-            inv.setItem(bottomRow + 0, createControlItem(Material.LIME_WOOL, "Merge Selected Packs", 
-                Arrays.asList("Click to merge the selected packs", "Output: " + outputName)));
-            inv.setItem(bottomRow + 1, createControlItem(Material.YELLOW_WOOL, "Preview Merge", 
-                Collections.singletonList("Click to preview the merged pack")));
-            inv.setItem(bottomRow + 8, createControlItem(Material.RED_WOOL, "Cancel", 
-                Collections.singletonList("Click to cancel merging")));
+            inv.setItem(bottomRow + 0, createControlItem(Material.LIME_WOOL,
+                messages().getMessageNoPrefix("gui.merge-button"),
+                Arrays.asList(messages().getMessageNoPrefix("gui.merge-button-lore"),
+                    messages().formatMessageNoPrefix("gui.output-lore", "pack", outputName))));
+            inv.setItem(bottomRow + 1, createControlItem(Material.YELLOW_WOOL,
+                messages().getMessageNoPrefix("gui.preview-button"),
+                Collections.singletonList(messages().getMessageNoPrefix("gui.preview-button-lore"))));
+            inv.setItem(bottomRow + 8, createControlItem(Material.RED_WOOL,
+                messages().getMessageNoPrefix("gui.cancel-button"),
+                Collections.singletonList(messages().getMessageNoPrefix("gui.cancel-button-lore"))));
 
             player.openInventory(inv);
         } catch (Exception e) {
             plugin.getLogger().warning("Failed to create merge GUI: " + e.getMessage());
-            player.sendMessage(ChatColor.RED + "Failed to open merge GUI. Please try again.");
+            player.sendMessage(messages().getMessage("gui.open-failed"));
             cleanup(player.getUniqueId());
         }
     }
@@ -96,10 +105,10 @@ public class MergeGUI implements Listener {
             meta.setDisplayName(ChatColor.GOLD + name);
             
             List<String> lore = new ArrayList<>();
-            lore.add(ChatColor.GRAY + "File: " + file.getName());
-            lore.add(ChatColor.GRAY + "Size: " + formatFileSize(file.length()));
+            lore.add(messages().formatMessageNoPrefix("gui.pack-file", "file", file.getName()));
+            lore.add(messages().formatMessageNoPrefix("gui.pack-size", "size", formatFileSize(file.length())));
             lore.add("");
-            lore.add(ChatColor.YELLOW + "Click to select/deselect");
+            lore.add(messages().getMessageNoPrefix("gui.click-to-select"));
             
             meta.setLore(lore);
             item.setItemMeta(meta);
@@ -117,13 +126,8 @@ public class MergeGUI implements Listener {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
-            meta.setDisplayName(ChatColor.GOLD + name);
-            
-            List<String> coloredLore = new ArrayList<>();
-            for (String line : lore) {
-                coloredLore.add(ChatColor.GRAY + line);
-            }
-            meta.setLore(coloredLore);
+            meta.setDisplayName(name);
+            meta.setLore(new ArrayList<>(lore));
             
             item.setItemMeta(meta);
         }
@@ -133,8 +137,8 @@ public class MergeGUI implements Listener {
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) return;
-        if (!openInventories.contains(player.getUniqueId())) return;
-        if (!event.getView().getTitle().equals(ChatColor.DARK_PURPLE + "Resource Pack Merger")) return;
+        Inventory mergeInventory = openInventories.get(player.getUniqueId());
+        if (mergeInventory == null || !mergeInventory.equals(event.getInventory())) return;
 
         event.setCancelled(true);
         ItemStack clicked = event.getCurrentItem();
@@ -151,7 +155,7 @@ public class MergeGUI implements Listener {
             handlePreviewAction(player, selectedList);
         } else if (clicked.getType() == Material.RED_WOOL) {
             player.closeInventory();
-            player.sendMessage(ChatColor.RED + "Merge operation cancelled.");
+            player.sendMessage(messages().getMessage("gui.cancelled"));
             player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
         }
     }
@@ -172,14 +176,15 @@ public class MergeGUI implements Listener {
         // Update item lore with selection status
         ItemMeta meta = clicked.getItemMeta();
         List<String> lore = meta.getLore();
-        lore.set(lore.size() - 1, ChatColor.YELLOW + (selectedList.contains(packName) ? "✓ Selected" : "Click to select/deselect"));
+        lore.set(lore.size() - 1, messages().getMessageNoPrefix(
+            selectedList.contains(packName) ? "gui.selected" : "gui.click-to-select"));
         meta.setLore(lore);
         clicked.setItemMeta(meta);
     }
 
     private void handleMergeAction(Player player, List<String> selectedList, String outputName) {
         if (selectedList.size() < 2) {
-            player.sendMessage(ChatColor.RED + "Please select at least 2 packs to merge!");
+            player.sendMessage(messages().getMessage("gui.select-more-merge"));
             player.playSound(player.getLocation(), ERROR_SOUND, 1.0f, 0.8f);
             return;
         }
@@ -190,7 +195,7 @@ public class MergeGUI implements Listener {
 
     private void handlePreviewAction(Player player, List<String> selectedList) {
         if (selectedList.size() < 2) {
-            player.sendMessage(ChatColor.RED + "Please select at least 2 packs to preview!");
+            player.sendMessage(messages().getMessage("gui.select-more-preview"));
             player.playSound(player.getLocation(), ERROR_SOUND, 1.0f, 0.8f);
             return;
         }
@@ -221,38 +226,39 @@ public class MergeGUI implements Listener {
             }
 
             if (packFiles.size() < 2) {
-                player.sendMessage(ChatColor.RED + "Error: Not enough valid packs selected!");
+                player.sendMessage(messages().getMessage("gui.not-enough-valid"));
                 player.playSound(player.getLocation(), ERROR_SOUND, 1.0f, 0.8f);
                 return;
             }
 
-            player.sendMessage(ChatColor.YELLOW + "Merging " + packFiles.size() + " resource packs...");
+            player.sendMessage(messages().formatMessage("gui.merging", "count", packFiles.size()));
             plugin.getServer().dispatchCommand(player, "mergepack " + outputName + " " + 
                 String.join(" ", packs));
         } catch (Exception e) {
             plugin.getLogger().warning("Failed to execute merge: " + e.getMessage());
-            player.sendMessage(ChatColor.RED + "Failed to merge packs. Please try again.");
+            player.sendMessage(messages().getMessage("gui.merge-failed"));
             player.playSound(player.getLocation(), ERROR_SOUND, 1.0f, 0.8f);
         }
     }
 
     private void previewMerge(Player player, List<String> packs) {
         try {
-            player.sendMessage(ChatColor.YELLOW + "Selected packs to merge:");
+            player.sendMessage(messages().getMessage("gui.preview-header"));
             long totalSize = 0;
             for (String pack : packs) {
                 File packFile = plugin.getResourcePacks().get(pack);
                 if (packFile != null && packFile.exists()) {
                     long size = packFile.length();
                     totalSize += size;
-                    player.sendMessage(ChatColor.GRAY + "- " + pack + " (" + formatFileSize(size) + ")");
+                    player.sendMessage(messages().formatMessageNoPrefix("gui.preview-entry",
+                        "pack", pack, "size", formatFileSize(size)));
                 }
             }
-            player.sendMessage(ChatColor.YELLOW + "Total size: " + formatFileSize(totalSize));
-            player.sendMessage(ChatColor.YELLOW + "Use the merge button to combine these packs.");
+            player.sendMessage(messages().formatMessageNoPrefix("gui.preview-total", "size", formatFileSize(totalSize)));
+            player.sendMessage(messages().getMessageNoPrefix("gui.preview-hint"));
         } catch (Exception e) {
             plugin.getLogger().warning("Failed to preview merge: " + e.getMessage());
-            player.sendMessage(ChatColor.RED + "Failed to generate preview. Please try again.");
+            player.sendMessage(messages().getMessage("gui.preview-failed"));
             player.playSound(player.getLocation(), ERROR_SOUND, 1.0f, 0.8f);
         }
     }
