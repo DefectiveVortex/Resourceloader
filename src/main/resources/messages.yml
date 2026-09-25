@@ -1,4 +1,5 @@
-# ResourceLoader Messages Configuration
+# ResourceLoader Messages Configuration (English)
+# To use another language, set "language" in config.yml (en, ru, tr, ko, zh).
 # Use & for color codes (e.g., &a for green, &c for red)
 # Use %player% for player name
 # Use %pack% for resource pack name
@@ -19,9 +20,12 @@ help:
   load: "&e/load [pack] &7- Load a resource pack"
   load-specific: "&e/load <pack> &7- Load a specific resource pack"
   list: "&e/packlist &7- List available resource packs"
+  autoload: "&e/autoload <pack|clear> &7- Set automatic pack loading"
   admin-header: "&6=== Admin Commands ==="
   merge: "&e/mergepack <output> <pack1> <pack2> &7- Merge resource packs"
+  mergegui: "&e/mergegui <output> &7- Open merge GUI"
   remove: "&e/removepack <pack> &7- Remove a resource pack"
+  checkpack: "&e/checkpack <pack> &7- Validate a resource pack"
   reload: "&e/resourcereload &7- Reload configuration"
   version: "&e/resourceversion &7- Check plugin version"
   cache: "&e/clearcache &7- Clear resource pack cache"
@@ -40,12 +44,15 @@ resource-packs:
   not-found: "&cResource pack '%pack%' not found."
   file-not-found: "&cResource pack file not found."
   invalid-path: "&cInvalid path for resource pack '%pack%'."
+  invalid-pack: "&cResource pack not found!"
 
 list:
   header: "&6=== Available Resource Packs ==="
   no-packs: "&7No resource packs available."
   default-pack: "&7Default Pack: &f%type%"
   pack-entry: "&7• &f%pack%"
+  type-url: "URL"
+  type-file: "File"
   footer: "&6==========================="
 
 autoload:
@@ -67,6 +74,23 @@ merge:
   invalid-pack: "&cResource pack '%pack%' not found!"
   output-exists: "&cA resource pack with name '%pack%' already exists!"
 
+remove:
+  usage: "&cUsage: /removepack <packname>"
+  not-found: "&cResource pack '%pack%' not found!"
+  failed: "&cFailed to remove resource pack '%pack%'!"
+  success: "&aSuccessfully removed resource pack '%pack%'!"
+
+checkpack:
+  usage: "&cUsage: /checkpack <packname>"
+  not-found: "&cResource pack '%pack%' not found in configuration."
+  url-pack: "&eValidating URL-based pack: %pack%"
+  url-note: "&7Note: URL packs are validated when downloaded. Use this command on local files for detailed validation."
+  file-not-found: "&cPack file not found: %file%"
+  validating: "&eValidating resource pack: &f%pack%"
+  file: "&7File: %file%"
+  success: "&a✓ Pack validation successful!"
+  failed: "&c✗ Pack validation failed!"
+
 cache:
   cleared: "&aResource pack cache has been cleared!"
   using-cached: "&7Using cached version of %pack%"
@@ -79,15 +103,46 @@ updates:
   current-version: "&eCurrent version: &f%version%"
   latest-version: "&eLatest version: &f%version%"
   up-to-date: "&aYou are running the latest version!"
+  new-version: "&aA new version is available!"
+  download: "&eDownload it from: &f%url%"
   check-failed: "&cFailed to check for updates."
+  parse-failed: "&cFailed to parse version information."
+  http-error: "&cFailed to check for updates. HTTP %code%"
+  check-error: "&cFailed to check for updates: %error%"
 
 gui:
-  title: "Resource Pack Merger"
+  title: "&5Resource Pack Merger"
   preview-title: "Pack Preview: %pack%"
   select-packs: "&eSelect packs to merge"
   conflict-detected: "&eConflict detected in: %file%"
   resolve-prompt: "&eHow would you like to resolve this conflict?"
   loading-preview: "&ePreparing preview..."
+  usage: "&cUsage: /mergegui <output_name>"
+  disabled: "&cThe GUI feature is disabled in the configuration."
+  too-many-packs: "&cToo many resource packs to display in GUI. Maximum: %max%"
+  open-failed: "&cFailed to open merge GUI. Please try again."
+  pack-file: "&7File: %file%"
+  pack-size: "&7Size: %size%"
+  click-to-select: "&eClick to select/deselect"
+  selected: "&e✓ Selected"
+  merge-button: "&6Merge Selected Packs"
+  merge-button-lore: "&7Click to merge the selected packs"
+  output-lore: "&7Output: %pack%"
+  preview-button: "&6Preview Merge"
+  preview-button-lore: "&7Click to preview the merged pack"
+  cancel-button: "&6Cancel"
+  cancel-button-lore: "&7Click to cancel merging"
+  cancelled: "&cMerge operation cancelled."
+  select-more-merge: "&cPlease select at least 2 packs to merge!"
+  select-more-preview: "&cPlease select at least 2 packs to preview!"
+  not-enough-valid: "&cError: Not enough valid packs selected!"
+  merging: "&eMerging %count% resource packs..."
+  merge-failed: "&cFailed to merge packs. Please try again."
+  preview-header: "&eSelected packs to merge:"
+  preview-entry: "&7- %pack% (%size%)"
+  preview-total: "&eTotal size: %size%"
+  preview-hint: "&eUse the merge button to combine these packs."
+  preview-failed: "&cFailed to generate preview. Please try again."
 
 backup:
   created: "&aCreated backup: %file%"
@@ -101,4 +156,8 @@ statistics:
 enforcement:
   declined: "&cYou must accept the resource pack to play on this server!"
   failed: "&cFailed to download the resource pack. Please try joining again!"
-  retry: "&eRetrying resource pack download in %seconds% seconds..." 
+  retry: "&eRetrying resource pack download in %seconds% seconds..."
+  restricted-command: "&cYou can't use this command until the resource pack has loaded."
+
+kick:
+  declined: "&cYou must accept the resource pack to play on this server!"

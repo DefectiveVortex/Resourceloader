@@ -31,7 +31,7 @@ public class CheckPackCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length != 1) {
-            sender.sendMessage("§cUsage: /checkpack <packname>");
+            sender.sendMessage(messageManager.getMessage("checkpack.usage"));
             return true;
         }
 
@@ -39,7 +39,7 @@ public class CheckPackCommand implements CommandExecutor, TabCompleter {
         
         // Check if pack exists in configuration
         if (!plugin.getConfig().contains("resource-packs." + packName)) {
-            sender.sendMessage("§cResource pack '" + packName + "' not found in configuration.");
+            sender.sendMessage(messageManager.formatMessage("checkpack.not-found", "pack", packName));
             return true;
         }
 
@@ -48,31 +48,32 @@ public class CheckPackCommand implements CommandExecutor, TabCompleter {
 
         // Determine if it's a local file or URL
         if (packPath.startsWith("http://") || packPath.startsWith("https://")) {
-            sender.sendMessage("§eValidating URL-based pack: " + packName);
-            sender.sendMessage("§7Note: URL packs are validated when downloaded. Use this command on local files for detailed validation.");
+            sender.sendMessage(messageManager.formatMessage("checkpack.url-pack", "pack", packName));
+            sender.sendMessage(messageManager.getMessageNoPrefix("checkpack.url-note"));
             return true;
         } else {
             // Local file
-            File packsDir = new File(plugin.getDataFolder(), "packs");
+            File packsDir = plugin.getPackManager().getResolvedResourcePackDirectory();
             packFile = new File(packsDir, packPath);
             
             if (!packFile.exists()) {
-                sender.sendMessage("§cPack file not found: " + packFile.getPath());
+                sender.sendMessage(messageManager.formatMessage("checkpack.file-not-found",
+                    "file", packFile.getPath()));
                 return true;
             }
         }
 
-        sender.sendMessage("§eValidating resource pack: §f" + packName);
-        sender.sendMessage("§7File: " + packFile.getName());
+        sender.sendMessage(messageManager.formatMessage("checkpack.validating", "pack", packName));
+        sender.sendMessage(messageManager.formatMessageNoPrefix("checkpack.file", "file", packFile.getName()));
         
         // Perform validation
         PackValidator.ValidationResult result = validator.validate(packFile);
         
         // Display results
         if (result.isValid()) {
-            sender.sendMessage("§a✓ Pack validation successful!");
+            sender.sendMessage(messageManager.getMessageNoPrefix("checkpack.success"));
         } else {
-            sender.sendMessage("§c✗ Pack validation failed!");
+            sender.sendMessage(messageManager.getMessageNoPrefix("checkpack.failed"));
         }
         
         // Show formatted results

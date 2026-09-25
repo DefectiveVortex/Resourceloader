@@ -1,0 +1,164 @@
+# ResourceLoader Mesajları (Türkçe)
+# config.yml içinde language: "tr" ayarıyla etkinleştirilir.
+# Renk kodları için & kullanın (ör. &a yeşil, &c kırmızı)
+# %player% oyuncu adı
+# %pack% kaynak paketi adı
+# %size% dosya boyutu
+# %current% ve %total% ilerleme sayıları
+# %...% yer tutucularını ve komut adlarını çevirmeyin.
+
+prefix: "&7[&eResourceLoader&7] &r"
+
+general:
+  no-permission: "&cBu komutu kullanma izniniz yok."
+  reload-success: "&aYapılandırma başarıyla yeniden yüklendi!"
+  reload-failed: "&cYapılandırma yeniden yüklenemedi: %error%"
+  invalid-pack: "&c'%pack%' kaynak paketi bulunamadı!"
+  players-only: "&cBu komut yalnızca oyuncular tarafından kullanılabilir."
+
+help:
+  header: "&6=== ResourceLoader Yardım ==="
+  load: "&e/load [pack] &7- Bir kaynak paketi yükle"
+  load-specific: "&e/load <pack> &7- Belirli bir kaynak paketini yükle"
+  list: "&e/packlist &7- Mevcut kaynak paketlerini listele"
+  autoload: "&e/autoload <pack|clear> &7- Otomatik paket yüklemeyi ayarla"
+  admin-header: "&6=== Yönetici Komutları ==="
+  merge: "&e/mergepack <output> <pack1> <pack2> &7- Kaynak paketlerini birleştir"
+  mergegui: "&e/mergegui <output> &7- Birleştirme menüsünü aç"
+  remove: "&e/removepack <pack> &7- Bir kaynak paketini kaldır"
+  checkpack: "&e/checkpack <pack> &7- Bir kaynak paketini doğrula"
+  reload: "&e/resourcereload &7- Yapılandırmayı yeniden yükle"
+  version: "&e/resourceversion &7- Eklenti sürümünü kontrol et"
+  cache: "&e/clearcache &7- Kaynak paketi önbelleğini temizle"
+  footer: "&6=========================="
+
+resource-packs:
+  loading: "&e%pack% kaynak paketi yükleniyor..."
+  load-success: "&aKaynak paketi başarıyla yüklendi!"
+  load-failed: "&cKaynak paketi yüklenemedi: %error%"
+  download-started: "&eKaynak paketi indiriliyor..."
+  download-success: "&aKaynak paketi indirildi, uygulanıyor..."
+  download-failed: "&cKaynak paketi indirilemedi. Lütfen tekrar deneyin."
+  invalid-url: "&cGeçersiz kaynak paketi URL'si. Lütfen bir yöneticiyle iletişime geçin."
+  already-loading: "&cZaten bir kaynak paketi yükleniyor, lütfen bekleyin..."
+  no-default: "&cVarsayılan kaynak paketi ayarlanmamış."
+  not-found: "&c'%pack%' kaynak paketi bulunamadı."
+  file-not-found: "&cKaynak paketi dosyası bulunamadı."
+  invalid-path: "&c'%pack%' kaynak paketi için geçersiz yol."
+  invalid-pack: "&cKaynak paketi bulunamadı!"
+
+list:
+  header: "&6=== Mevcut Kaynak Paketleri ==="
+  no-packs: "&7Mevcut kaynak paketi yok."
+  default-pack: "&7Varsayılan Paket: &f%type%"
+  pack-entry: "&7• &f%pack%"
+  type-url: "URL"
+  type-file: "Dosya"
+  footer: "&6==========================="
+
+autoload:
+  no-preference: "&eAyarlanmış tercih edilen bir kaynak paketiniz yok."
+  current-preference: "&eŞu anki tercih ettiğiniz paket: &6%pack%"
+  set: "&6%pack% &atercih ettiğiniz kaynak paketi olarak ayarlandı."
+  set-failed: "&c&6%pack% &ckaynak paketi uygulanamadı: %error%"
+  cleared: "&aKaynak paketi tercihleriniz temizlendi."
+  loaded: "&aTercih ettiğiniz paket otomatik olarak yüklendi: &6%pack%"
+
+merge:
+  started: "&7Kaynak paketleri birleştirilmeye başlanıyor..."
+  progress: "&7Paket birleştiriliyor &e%current%&7/&e%total%"
+  success: "&aKaynak paketleri başarıyla birleştirildi: &e%pack%"
+  failed: "&cKaynak paketleri birleştirilemedi: %error%"
+  already-merging: "&cZaten bir birleştirme işlemi devam ediyor. Lütfen bekleyin."
+  invalid-usage: "&cKullanım: /mergepack <output_name> <pack1> <pack2> [pack3...]"
+  no-packs: "&cBirleştirmek için en az iki paket belirtmelisiniz!"
+  invalid-pack: "&c'%pack%' kaynak paketi bulunamadı!"
+  output-exists: "&c'%pack%' adında bir kaynak paketi zaten var!"
+
+remove:
+  usage: "&cKullanım: /removepack <packname>"
+  not-found: "&c'%pack%' kaynak paketi bulunamadı!"
+  failed: "&c'%pack%' kaynak paketi kaldırılamadı!"
+  success: "&a'%pack%' kaynak paketi başarıyla kaldırıldı!"
+
+checkpack:
+  usage: "&cKullanım: /checkpack <packname>"
+  not-found: "&c'%pack%' kaynak paketi yapılandırmada bulunamadı."
+  url-pack: "&eURL tabanlı paket doğrulanıyor: %pack%"
+  url-note: "&7Not: URL paketleri indirildiklerinde doğrulanır. Ayrıntılı doğrulama için bu komutu yerel dosyalarda kullanın."
+  file-not-found: "&cPaket dosyası bulunamadı: %file%"
+  validating: "&eKaynak paketi doğrulanıyor: &f%pack%"
+  file: "&7Dosya: %file%"
+  success: "&a✓ Paket doğrulaması başarılı!"
+  failed: "&c✗ Paket doğrulaması başarısız!"
+
+cache:
+  cleared: "&aKaynak paketi önbelleği temizlendi!"
+  using-cached: "&7%pack% paketinin önbellekteki sürümü kullanılıyor"
+  downloading-new: "&7%pack% paketinin yeni sürümü indiriliyor"
+
+updates:
+  available: "&eYeni bir sürüm mevcut! Mevcut: &c%current%&e, En son: &a%latest%"
+  check-command: "&eDaha fazla bilgi için &f/resourceversion check &ekomutunu kullanın."
+  checking: "&eGüncellemeler kontrol ediliyor..."
+  current-version: "&eMevcut sürüm: &f%version%"
+  latest-version: "&eEn son sürüm: &f%version%"
+  up-to-date: "&aEn son sürümü kullanıyorsunuz!"
+  new-version: "&aYeni bir sürüm mevcut!"
+  download: "&eŞuradan indirin: &f%url%"
+  check-failed: "&cGüncellemeler kontrol edilemedi."
+  parse-failed: "&cSürüm bilgisi ayrıştırılamadı."
+  http-error: "&cGüncellemeler kontrol edilemedi. HTTP %code%"
+  check-error: "&cGüncellemeler kontrol edilemedi: %error%"
+
+gui:
+  title: "&5Kaynak Paketi Birleştirici"
+  preview-title: "Paket Önizlemesi: %pack%"
+  select-packs: "&eBirleştirilecek paketleri seçin"
+  conflict-detected: "&eÇakışma tespit edildi: %file%"
+  resolve-prompt: "&eBu çakışmayı nasıl çözmek istersiniz?"
+  loading-preview: "&eÖnizleme hazırlanıyor..."
+  usage: "&cKullanım: /mergegui <output_name>"
+  disabled: "&cMenü özelliği yapılandırmada devre dışı bırakılmış."
+  too-many-packs: "&cMenüde gösterilemeyecek kadar çok kaynak paketi var. En fazla: %max%"
+  open-failed: "&cBirleştirme menüsü açılamadı. Lütfen tekrar deneyin."
+  pack-file: "&7Dosya: %file%"
+  pack-size: "&7Boyut: %size%"
+  click-to-select: "&eSeçmek/seçimi kaldırmak için tıklayın"
+  selected: "&e✓ Seçildi"
+  merge-button: "&6Seçili Paketleri Birleştir"
+  merge-button-lore: "&7Seçili paketleri birleştirmek için tıklayın"
+  output-lore: "&7Çıktı: %pack%"
+  preview-button: "&6Birleştirmeyi Önizle"
+  preview-button-lore: "&7Birleştirilmiş paketi önizlemek için tıklayın"
+  cancel-button: "&6İptal"
+  cancel-button-lore: "&7Birleştirmeyi iptal etmek için tıklayın"
+  cancelled: "&cBirleştirme işlemi iptal edildi."
+  select-more-merge: "&cBirleştirmek için lütfen en az 2 paket seçin!"
+  select-more-preview: "&cÖnizlemek için lütfen en az 2 paket seçin!"
+  not-enough-valid: "&cHata: Yeterli sayıda geçerli paket seçilmedi!"
+  merging: "&e%count% kaynak paketi birleştiriliyor..."
+  merge-failed: "&cPaketler birleştirilemedi. Lütfen tekrar deneyin."
+  preview-header: "&eBirleştirilmek üzere seçilen paketler:"
+  preview-entry: "&7- %pack% (%size%)"
+  preview-total: "&eToplam boyut: %size%"
+  preview-hint: "&eBu paketleri birleştirmek için birleştirme düğmesini kullanın."
+  preview-failed: "&cÖnizleme oluşturulamadı. Lütfen tekrar deneyin."
+
+backup:
+  created: "&aYedek oluşturuldu: %file%"
+  failed: "&cYedek oluşturulamadı: %error%"
+  cleaned: "&7Eski yedek temizlendi: %file%"
+
+statistics:
+  recorded: "&7Paket kullanımı kaydedildi: %pack%"
+  preference-saved: "&7%player% için paket tercihi kaydedildi"
+
+enforcement:
+  declined: "&cBu sunucuda oynamak için kaynak paketini kabul etmelisiniz!"
+  failed: "&cKaynak paketi indirilemedi. Lütfen tekrar katılmayı deneyin!"
+  retry: "&eKaynak paketi indirmesi %seconds% saniye içinde yeniden denenecek..."
+  restricted-command: "&cKaynak paketi yüklenene kadar bu komutu kullanamazsınız."
+
+kick:
+  declined: "&cBu sunucuda oynamak için kaynak paketini kabul etmelisiniz!"

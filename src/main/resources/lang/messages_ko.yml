@@ -1,0 +1,164 @@
+# ResourceLoader 메시지 (한국어)
+# config.yml에서 language: "ko"로 설정하면 사용됩니다.
+# 색상 코드는 &를 사용합니다 (예: &a 초록색, &c 빨간색)
+# %player% 플레이어 이름
+# %pack% 리소스 팩 이름
+# %size% 파일 크기
+# %current% 및 %total% 진행 상황 숫자
+# %...% 형태의 자리 표시자와 명령어 이름은 번역하지 마세요.
+
+prefix: "&7[&eResourceLoader&7] &r"
+
+general:
+  no-permission: "&c이 명령어를 사용할 권한이 없습니다."
+  reload-success: "&a설정을 성공적으로 다시 불러왔습니다!"
+  reload-failed: "&c설정을 다시 불러오지 못했습니다: %error%"
+  invalid-pack: "&c리소스 팩 '%pack%'을(를) 찾을 수 없습니다!"
+  players-only: "&c이 명령어는 플레이어만 사용할 수 있습니다."
+
+help:
+  header: "&6=== ResourceLoader 도움말 ==="
+  load: "&e/load [pack] &7- 리소스 팩 불러오기"
+  load-specific: "&e/load <pack> &7- 특정 리소스 팩 불러오기"
+  list: "&e/packlist &7- 사용 가능한 리소스 팩 목록"
+  autoload: "&e/autoload <pack|clear> &7- 자동 팩 불러오기 설정"
+  admin-header: "&6=== 관리자 명령어 ==="
+  merge: "&e/mergepack <output> <pack1> <pack2> &7- 리소스 팩 병합"
+  mergegui: "&e/mergegui <output> &7- 병합 메뉴 열기"
+  remove: "&e/removepack <pack> &7- 리소스 팩 삭제"
+  checkpack: "&e/checkpack <pack> &7- 리소스 팩 검사"
+  reload: "&e/resourcereload &7- 설정 다시 불러오기"
+  version: "&e/resourceversion &7- 플러그인 버전 확인"
+  cache: "&e/clearcache &7- 리소스 팩 캐시 비우기"
+  footer: "&6=========================="
+
+resource-packs:
+  loading: "&e리소스 팩 %pack% 불러오는 중..."
+  load-success: "&a리소스 팩을 성공적으로 불러왔습니다!"
+  load-failed: "&c리소스 팩을 불러오지 못했습니다: %error%"
+  download-started: "&e리소스 팩 다운로드 중..."
+  download-success: "&a리소스 팩 다운로드 완료, 적용 중..."
+  download-failed: "&c리소스 팩을 다운로드하지 못했습니다. 다시 시도해 주세요."
+  invalid-url: "&c잘못된 리소스 팩 URL입니다. 관리자에게 문의하세요."
+  already-loading: "&c이미 리소스 팩을 불러오는 중입니다. 잠시 기다려 주세요..."
+  no-default: "&c기본 리소스 팩이 설정되어 있지 않습니다."
+  not-found: "&c리소스 팩 '%pack%'을(를) 찾을 수 없습니다."
+  file-not-found: "&c리소스 팩 파일을 찾을 수 없습니다."
+  invalid-path: "&c리소스 팩 '%pack%'의 경로가 올바르지 않습니다."
+  invalid-pack: "&c리소스 팩을 찾을 수 없습니다!"
+
+list:
+  header: "&6=== 사용 가능한 리소스 팩 ==="
+  no-packs: "&7사용 가능한 리소스 팩이 없습니다."
+  default-pack: "&7기본 팩: &f%type%"
+  pack-entry: "&7• &f%pack%"
+  type-url: "URL"
+  type-file: "파일"
+  footer: "&6==========================="
+
+autoload:
+  no-preference: "&e선호하는 리소스 팩이 설정되어 있지 않습니다."
+  current-preference: "&e현재 선호하는 팩: &6%pack%"
+  set: "&6%pack%&a을(를) 선호하는 리소스 팩으로 설정했습니다."
+  set-failed: "&c리소스 팩 &6%pack%&c을(를) 적용하지 못했습니다: %error%"
+  cleared: "&a리소스 팩 선호 설정을 초기화했습니다."
+  loaded: "&a선호하는 팩을 자동으로 불러왔습니다: &6%pack%"
+
+merge:
+  started: "&7리소스 팩 병합을 시작합니다..."
+  progress: "&7팩 병합 중 &e%current%&7/&e%total%"
+  success: "&a리소스 팩을 성공적으로 병합했습니다: &e%pack%"
+  failed: "&c리소스 팩을 병합하지 못했습니다: %error%"
+  already-merging: "&c이미 병합 작업이 진행 중입니다. 잠시 기다려 주세요."
+  invalid-usage: "&c사용법: /mergepack <output_name> <pack1> <pack2> [pack3...]"
+  no-packs: "&c병합하려면 최소 두 개의 팩을 지정해야 합니다!"
+  invalid-pack: "&c리소스 팩 '%pack%'을(를) 찾을 수 없습니다!"
+  output-exists: "&c'%pack%' 이름의 리소스 팩이 이미 존재합니다!"
+
+remove:
+  usage: "&c사용법: /removepack <packname>"
+  not-found: "&c리소스 팩 '%pack%'을(를) 찾을 수 없습니다!"
+  failed: "&c리소스 팩 '%pack%'을(를) 삭제하지 못했습니다!"
+  success: "&a리소스 팩 '%pack%'을(를) 성공적으로 삭제했습니다!"
+
+checkpack:
+  usage: "&c사용법: /checkpack <packname>"
+  not-found: "&c설정에서 리소스 팩 '%pack%'을(를) 찾을 수 없습니다."
+  url-pack: "&eURL 기반 팩 검사 중: %pack%"
+  url-note: "&7참고: URL 팩은 다운로드할 때 검사됩니다. 자세한 검사는 로컬 파일에 이 명령어를 사용하세요."
+  file-not-found: "&c팩 파일을 찾을 수 없습니다: %file%"
+  validating: "&e리소스 팩 검사 중: &f%pack%"
+  file: "&7파일: %file%"
+  success: "&a✓ 팩 검사를 통과했습니다!"
+  failed: "&c✗ 팩 검사에 실패했습니다!"
+
+cache:
+  cleared: "&a리소스 팩 캐시를 비웠습니다!"
+  using-cached: "&7%pack%의 캐시된 버전을 사용합니다"
+  downloading-new: "&7%pack%의 새 버전을 다운로드합니다"
+
+updates:
+  available: "&e새 버전이 있습니다! 현재: &c%current%&e, 최신: &a%latest%"
+  check-command: "&e자세한 정보는 &f/resourceversion check &e명령어를 사용하세요."
+  checking: "&e업데이트 확인 중..."
+  current-version: "&e현재 버전: &f%version%"
+  latest-version: "&e최신 버전: &f%version%"
+  up-to-date: "&a최신 버전을 사용하고 있습니다!"
+  new-version: "&a새 버전이 있습니다!"
+  download: "&e다운로드: &f%url%"
+  check-failed: "&c업데이트를 확인하지 못했습니다."
+  parse-failed: "&c버전 정보를 해석하지 못했습니다."
+  http-error: "&c업데이트를 확인하지 못했습니다. HTTP %code%"
+  check-error: "&c업데이트를 확인하지 못했습니다: %error%"
+
+gui:
+  title: "&5리소스 팩 병합"
+  preview-title: "팩 미리보기: %pack%"
+  select-packs: "&e병합할 팩을 선택하세요"
+  conflict-detected: "&e충돌 발견: %file%"
+  resolve-prompt: "&e이 충돌을 어떻게 해결하시겠습니까?"
+  loading-preview: "&e미리보기 준비 중..."
+  usage: "&c사용법: /mergegui <output_name>"
+  disabled: "&c설정에서 메뉴 기능이 비활성화되어 있습니다."
+  too-many-packs: "&c메뉴에 표시하기에 리소스 팩이 너무 많습니다. 최대: %max%"
+  open-failed: "&c병합 메뉴를 열지 못했습니다. 다시 시도해 주세요."
+  pack-file: "&7파일: %file%"
+  pack-size: "&7크기: %size%"
+  click-to-select: "&e클릭하여 선택/해제"
+  selected: "&e✓ 선택됨"
+  merge-button: "&6선택한 팩 병합"
+  merge-button-lore: "&7클릭하여 선택한 팩을 병합합니다"
+  output-lore: "&7출력: %pack%"
+  preview-button: "&6병합 미리보기"
+  preview-button-lore: "&7클릭하여 병합된 팩을 미리 봅니다"
+  cancel-button: "&6취소"
+  cancel-button-lore: "&7클릭하여 병합을 취소합니다"
+  cancelled: "&c병합 작업이 취소되었습니다."
+  select-more-merge: "&c병합하려면 최소 2개의 팩을 선택하세요!"
+  select-more-preview: "&c미리 보려면 최소 2개의 팩을 선택하세요!"
+  not-enough-valid: "&c오류: 유효한 팩이 충분히 선택되지 않았습니다!"
+  merging: "&e리소스 팩 %count%개 병합 중..."
+  merge-failed: "&c팩을 병합하지 못했습니다. 다시 시도해 주세요."
+  preview-header: "&e병합할 팩:"
+  preview-entry: "&7- %pack% (%size%)"
+  preview-total: "&e총 크기: %size%"
+  preview-hint: "&e병합 버튼을 눌러 이 팩들을 합치세요."
+  preview-failed: "&c미리보기를 생성하지 못했습니다. 다시 시도해 주세요."
+
+backup:
+  created: "&a백업 생성: %file%"
+  failed: "&c백업을 생성하지 못했습니다: %error%"
+  cleaned: "&7오래된 백업 정리: %file%"
+
+statistics:
+  recorded: "&7팩 사용 기록: %pack%"
+  preference-saved: "&7%player%의 팩 선호 설정을 저장했습니다"
+
+enforcement:
+  declined: "&c이 서버에서 플레이하려면 리소스 팩을 수락해야 합니다!"
+  failed: "&c리소스 팩을 다운로드하지 못했습니다. 다시 접속해 주세요!"
+  retry: "&e%seconds%초 후 리소스 팩 다운로드를 다시 시도합니다..."
+  restricted-command: "&c리소스 팩을 불러오기 전에는 이 명령어를 사용할 수 없습니다."
+
+kick:
+  declined: "&c이 서버에서 플레이하려면 리소스 팩을 수락해야 합니다!"

@@ -111,6 +111,8 @@ public class ResourcePackManager {
                 if (!silent) {
                     logger.info("Loaded default server pack: " + serverPack);
                 }
+            } else if (!serverPack.startsWith("http://") && !serverPack.startsWith("https://")) {
+                logger.warning("Default server pack file not found: " + serverPackFile.getAbsolutePath());
             }
         }
 
@@ -127,7 +129,8 @@ public class ResourcePackManager {
                             logger.info("Loaded resource pack: " + key);
                         }
                     } else {
-                        logger.warning("Resource pack file not found: " + packPath);
+                        logger.warning("Resource pack file for '" + key + "' not found: "
+                            + packFile.getAbsolutePath());
                     }
                 } else if (packPath != null) {
                     resourcePacks.put(key, null);

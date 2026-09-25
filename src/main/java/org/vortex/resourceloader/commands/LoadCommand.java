@@ -45,18 +45,30 @@ public class LoadCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        String packName = args[0].toLowerCase();
+        String packName = findPackName(args[0]);
         ConfigurationSection packs = plugin.getConfig().getConfigurationSection("resource-packs");
 
-        if (!plugin.getResourcePacks().containsKey(packName)) {
+        if (packName == null || packs == null) {
             player.sendMessage(plugin.getMessageManager().formatMessage("resource-packs.not-found",
-                    "pack", packName));
+                    "pack", args[0]));
             return true;
         }
 
         String packPath = packs.getString(packName);
         loadResourcePack(player, packName, packPath);
         return true;
+    }
+
+    private String findPackName(String input) {
+        if (plugin.getResourcePacks().containsKey(input)) {
+            return input;
+        }
+        for (String name : plugin.getResourcePacks().keySet()) {
+            if (name.equalsIgnoreCase(input)) {
+                return name;
+            }
+        }
+        return null;
     }
 
     public void loadResourcePack(Player player, String packName, String packPath) {

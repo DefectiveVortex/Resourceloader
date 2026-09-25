@@ -53,11 +53,33 @@
 - `resourceloader.admin` - Access to all admin commands (default: op)
 - `resourceloader.bypass` - Bypass forced resource pack loading (default: op)
 
+## Languages
+
+ResourceLoader ships with translated messages for:
+
+| Code | Language |
+|------|----------|
+| `en` | English (default) |
+| `ru` | Русский (Russian) |
+| `tr` | Türkçe (Turkish) |
+| `ko` | 한국어 (Korean) |
+| `zh` | 简体中文 (Simplified Chinese) |
+
+Set `language` in `config.yml` and run `/resourcereload`. Locale-style values such as `ru_RU` or `zh-CN` are also accepted.
+Translated messages are written to `plugins/Resourceloader/lang/messages_<code>.yml` and can be customised there; English messages live in `messages.yml`.
+Any message missing from a translation falls back to English.
+
 ## Configuration
 
 ```yaml
 # ResourceLoader Configuration
 # For detailed documentation, visit: https://github.com/DefectiveVortex/Resourceloader
+
+# Language used for chat messages, kick messages and the merge GUI
+# Supported: en (English), ru (Russian), tr (Turkish), ko (Korean), zh (Simplified Chinese)
+# Translated messages are saved to plugins/Resourceloader/lang/messages_<code>.yml
+# and can be edited there. English messages live in messages.yml.
+language: "en"
 
 #====================#
 # Resource Packs     #
@@ -70,6 +92,8 @@
 server-pack: ""
 
 # Individual resource pack definitions
+# Every entry MUST be indented under "resource-packs:" (two spaces), otherwise it is ignored.
+# Pack files go in plugins/Resourceloader/packs/ (or storage.resource-pack-directory).
 # Format:
 #   packname: "filename.zip"    # For local files
 #   packname: "https://..."    # For external URLs
@@ -231,6 +255,15 @@ enforcement:
 ## Troubleshooting & Best Practices
 
 ### Common Issues
+- **Packs Not Showing Up / `/load` Says "Not Found"**: Pack entries must be indented under `resource-packs:`. Entries placed at the top level of `config.yml` are moved there automatically on startup/reload (a backup is saved as `config.yml.pre-repair.bak`). Correct layout:
+  ```yaml
+  server-pack: "server-pack.zip"   # one file name or URL, used by /load and enforcement
+  resource-packs:
+    brackenpack: "bprpv71.zip"
+    katters: "Katters Structures Resource Pack.zip"
+  ```
+  The console logs the full path where each missing pack file was expected.
+- **Enforcement Enabled but Nothing Is Sent on Join**: Enforcement sends the `server-pack`, so it must not be empty.
 - **Pack Not Loading**: Use `/checkpack <packname>` to validate pack structure and identify issues
 - **Config Corruption**: Plugin automatically prevents duplicate entries and config corruption
 - **Performance Issues**: Enable SHA1 caching and compression for better performance

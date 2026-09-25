@@ -122,7 +122,7 @@ public final class ConfigFileUpdater {
     private static void saveWithBackup(JavaPlugin plugin, String resourceName, File targetFile,
                                        YamlConfiguration currentConfig, int addedValues) {
         try {
-            File backupFile = new File(targetFile.getParentFile(), resourceName + ".pre-update.bak");
+            File backupFile = new File(targetFile.getParentFile(), targetFile.getName() + ".pre-update.bak");
             Files.copy(targetFile.toPath(), backupFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
             currentConfig.save(targetFile);
             plugin.getLogger().info("Updated " + resourceName + " with " + addedValues
