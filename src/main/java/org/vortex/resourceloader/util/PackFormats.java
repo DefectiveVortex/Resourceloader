@@ -7,6 +7,7 @@ import org.bukkit.Bukkit;
 import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -33,10 +34,36 @@ public final class PackFormats {
     private PackFormats() {
     }
 
-    public record Version(int major, int minor) implements Comparable<Version> {
+    public static final class Version implements Comparable<Version> {
+        private final int major;
+        private final int minor;
+
+        public Version(int major, int minor) {
+            this.major = major;
+            this.minor = minor;
+        }
+
+        public int major() {
+            return major;
+        }
+
+        public int minor() {
+            return minor;
+        }
+
         @Override
         public int compareTo(Version o) {
             return major != o.major ? Integer.compare(major, o.major) : Integer.compare(minor, o.minor);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof Version && ((Version) o).major == major && ((Version) o).minor == minor;
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * major + minor;
         }
 
         @Override
@@ -45,7 +72,23 @@ public final class PackFormats {
         }
     }
 
-    public record Range(Version min, Version max) {
+    public static final class Range {
+        private final Version min;
+        private final Version max;
+
+        public Range(Version min, Version max) {
+            this.min = min;
+            this.max = max;
+        }
+
+        public Version min() {
+            return min;
+        }
+
+        public Version max() {
+            return max;
+        }
+
         public boolean contains(Version v) {
             return min.compareTo(v) <= 0 && max.compareTo(v) >= 0;
         }
@@ -111,24 +154,29 @@ public final class PackFormats {
         if (!m.find()) {
             return null;
         }
-        int format = switch (m.group(1)) {
-            case "1.21.7", "1.21.8" -> 64;
-            case "1.21.6" -> 63;
-            case "1.21.5" -> 55;
-            case "1.21.4" -> 46;
-            case "1.21.2", "1.21.3" -> 42;
-            case "1.21", "1.21.1" -> 34;
-            case "1.20.5", "1.20.6" -> 32;
-            case "1.20.3", "1.20.4" -> 22;
-            case "1.20.2" -> 18;
-            case "1.20", "1.20.1" -> 15;
-            case "1.19.4" -> 13;
-            case "1.19.3" -> 12;
-            case "1.19", "1.19.1", "1.19.2" -> 9;
-            case "1.18", "1.18.1", "1.18.2" -> 8;
-            case "1.17", "1.17.1" -> 7;
-            default -> -1;
-        };
+        int format;
+        switch (m.group(1)) {
+            case "1.21.7": case "1.21.8": format = 64; break;
+            case "1.21.6": format = 63; break;
+            case "1.21.5": format = 55; break;
+            case "1.21.4": format = 46; break;
+            case "1.21.2": case "1.21.3": format = 42; break;
+            case "1.21": case "1.21.1": format = 34; break;
+            case "1.20.5": case "1.20.6": format = 32; break;
+            case "1.20.3": case "1.20.4": format = 22; break;
+            case "1.20.2": format = 18; break;
+            case "1.20": case "1.20.1": format = 15; break;
+            case "1.19.4": format = 13; break;
+            case "1.19.3": format = 12; break;
+            case "1.19": case "1.19.1": case "1.19.2": format = 9; break;
+            case "1.18": case "1.18.1": case "1.18.2": format = 8; break;
+            case "1.17": case "1.17.1": format = 7; break;
+            case "1.16.2": case "1.16.3": case "1.16.4": case "1.16.5": format = 6; break;
+            case "1.15": case "1.15.1": case "1.15.2": case "1.16": case "1.16.1": format = 5; break;
+            case "1.13": case "1.13.1": case "1.13.2":
+            case "1.14": case "1.14.1": case "1.14.2": case "1.14.3": case "1.14.4": format = 4; break;
+            default: format = -1;
+        }
         return format < 0 ? null : new Version(format, 0);
     }
 
@@ -166,14 +214,16 @@ public final class PackFormats {
         if (single != null) {
             return new Range(new Version(single, 0), new Version(single, ANY_MINOR));
         }
-        if (value instanceof List<?> list && list.size() == 2) {
+        if (value instanceof List && ((List<?>) value).size() == 2) {
+            List<?> list = (List<?>) value;
             Integer lo = asInt(list.get(0));
             Integer hi = asInt(list.get(1));
             if (lo != null && hi != null) {
                 return new Range(new Version(lo, 0), new Version(hi, ANY_MINOR));
             }
         }
-        if (value instanceof Map<?, ?> map) {
+        if (value instanceof Map) {
+            Map<?, ?> map = (Map<?, ?>) value;
             Integer lo = asInt(map.get("min_inclusive"));
             Integer hi = asInt(map.get("max_inclusive"));
             if (lo != null && hi != null) {
@@ -188,7 +238,8 @@ public final class PackFormats {
         if (major != null) {
             return new Version(major, upperBound ? ANY_MINOR : 0);
         }
-        if (value instanceof List<?> list && !list.isEmpty()) {
+        if (value instanceof List && !((List<?>) value).isEmpty()) {
+            List<?> list = (List<?>) value;
             Integer maj = asInt(list.get(0));
             Integer min = list.size() > 1 ? asInt(list.get(1)) : null;
             if (maj != null) {
@@ -199,7 +250,7 @@ public final class PackFormats {
     }
 
     private static Integer asInt(Object value) {
-        return value instanceof Number n ? n.intValue() : null;
+        return value instanceof Number ? ((Number) value).intValue() : null;
     }
 
     /** Problems the game itself would reject this pack.mcmeta for. Empty if it would load. */
@@ -231,14 +282,21 @@ public final class PackFormats {
     }
 
     /**
-     * Rewrites the version fields of a "pack" section so that it declares exactly {@code range},
-     * in a form every game version in that range accepts.
+     * Rewrites the version fields of a "pack" section so that it declares {@code range}, in a form every
+     * game version in that range accepts. Clients before 1.20.2 read only pack_format, so when the server's
+     * own format ({@code server}, may be null) is covered, pack_format names it.
      */
-    public static void writeRange(Map<String, Object> pack, Range range) {
+    public static void writeRange(Map<String, Object> pack, Range range, Version server) {
         pack.remove("pack_format");
         pack.remove("supported_formats");
         pack.remove("min_format");
         pack.remove("max_format");
+
+        if (server != null && server.major() < FIRST_MULTI_VERSION_FORMAT) {
+            // Before 1.20 there are no ranges, and newer games refuse ranges starting this low
+            pack.put("pack_format", server.major());
+            return;
+        }
 
         Version min = range.min();
         Version max = range.max();
@@ -247,14 +305,15 @@ public final class PackFormats {
             min = new Version(FIRST_MULTI_VERSION_FORMAT, 0);
         }
         if (max.major() >= FIRST_MINOR_FORMAT) {
-            pack.put("min_format", List.of(min.major(), min.minor()));
-            pack.put("max_format", max.minor() == ANY_MINOR ? max.major() : List.of(max.major(), max.minor()));
+            pack.put("min_format", Arrays.asList(min.major(), min.minor()));
+            pack.put("max_format", max.minor() == ANY_MINOR ? (Object) max.major() : Arrays.asList(max.major(), max.minor()));
         }
         if (min.major() < FIRST_MINOR_FORMAT) {
             int legacyMax = Math.min(max.major(), LAST_LEGACY_FORMAT);
-            pack.put("pack_format", min.major());
+            boolean serverCovered = server != null && server.major() >= min.major() && server.major() <= legacyMax;
+            pack.put("pack_format", serverCovered ? server.major() : min.major());
             if (legacyMax > min.major() || max.major() >= FIRST_MINOR_FORMAT) {
-                pack.put("supported_formats", List.of(min.major(), legacyMax));
+                pack.put("supported_formats", Arrays.asList(min.major(), legacyMax));
             }
         }
     }

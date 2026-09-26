@@ -8,6 +8,7 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerResourcePackStatusEvent;
 import org.vortex.resourceloader.Resourceloader;
+import org.vortex.resourceloader.util.ServerCompat;
 
 import java.util.List;
 import java.util.Map;
@@ -92,8 +93,10 @@ public class ResourcePackEnforcer implements Listener {
         UUID enforcedId = enforcedPacks.get(player.getUniqueId());
 
         // Only the pack sent on join under enforcement is mandatory; packs a player
-        // picks with /load or /autoload afterwards can be declined freely
-        if (enforcedId == null || !enforcedId.equals(event.getID())) {
+        // picks with /load or /autoload afterwards can be declined freely.
+        // Before 1.20.3 events carry no pack id, but a client then holds a single pack.
+        UUID statusId = ServerCompat.statusId(event);
+        if (enforcedId == null || (statusId != null && !enforcedId.equals(statusId))) {
             return;
         }
         if (!enforcementActive() || player.hasPermission("resourceloader.bypass")) {
@@ -102,7 +105,8 @@ public class ResourcePackEnforcer implements Listener {
         }
 
         switch (event.getStatus()) {
-            case SUCCESSFULLY_LOADED, DISCARDED:
+            case SUCCESSFULLY_LOADED:
+            case DISCARDED:
                 release(player.getUniqueId());
                 break;
             case DECLINED:
@@ -111,7 +115,9 @@ public class ResourcePackEnforcer implements Listener {
                     player.kickPlayer(plugin.getMessageManager().getMessage("enforcement.declined"));
                 }
                 break;
-            case FAILED_DOWNLOAD, INVALID_URL, FAILED_RELOAD:
+            case FAILED_DOWNLOAD:
+            case INVALID_URL:
+            case FAILED_RELOAD:
                 release(player.getUniqueId());
                 if (plugin.getConfig().getBoolean("enforcement.kick-on-fail", true)) {
                     player.kickPlayer(plugin.getMessageManager().getMessage("enforcement.failed"));

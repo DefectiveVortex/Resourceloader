@@ -87,7 +87,7 @@ public class EarlyPackLoader {
                     // Create a public URL without authentication
                     String host = resolvePublicHost();
                     int port = plugin.getConfig().getInt("server.port", 40021);
-                    String encodedPackPath = URLEncoder.encode(serverPack, StandardCharsets.UTF_8).replace("+", "%20");
+                    String encodedPackPath = encode(serverPack).replace("+", "%20");
                     packUrl = String.format("http://%s:%d/public/%s", host, port, encodedPackPath);
 
                     // We need to modify our ResourcePackServer to handle public URLs
@@ -206,9 +206,17 @@ public class EarlyPackLoader {
         return hexString.toString();
     }
 
+    private static String encode(String value) {
+        try {
+            return URLEncoder.encode(value, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     private String resolvePublicHost() {
         String configured = plugin.getConfig().getString("server.address", "");
-        if (!configured.isBlank()) {
+        if (!configured.trim().isEmpty()) {
             return configured;
         }
 
@@ -217,13 +225,13 @@ public class EarlyPackLoader {
         }
 
         String serverIp = plugin.getServer().getIp();
-        if (serverIp != null && !serverIp.isBlank() && !"0.0.0.0".equals(serverIp)) {
+        if (serverIp != null && !serverIp.trim().isEmpty() && !"0.0.0.0".equals(serverIp)) {
             return serverIp;
         }
 
         try {
             String detected = InetAddress.getLocalHost().getHostAddress();
-            if (detected != null && !detected.isBlank()) {
+            if (detected != null && !detected.trim().isEmpty()) {
                 return detected;
             }
         } catch (IOException ignored) {

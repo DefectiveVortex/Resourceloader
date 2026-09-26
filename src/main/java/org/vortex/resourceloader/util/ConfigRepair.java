@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -105,7 +106,7 @@ public final class ConfigRepair {
     }
 
     private static boolean looksLikePackReference(String value) {
-        if (value == null || value.isBlank()) {
+        if (value == null || value.trim().isEmpty()) {
             return false;
         }
         String lower = value.trim().toLowerCase(Locale.ROOT);
@@ -115,7 +116,7 @@ public final class ConfigRepair {
     private static Set<String> loadBundledTopLevelKeys(JavaPlugin plugin) {
         try (InputStream stream = plugin.getResource(CONFIG_FILE)) {
             if (stream == null) {
-                return Set.of();
+                return Collections.emptySet();
             }
             try (InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
                 Set<String> keys = new HashSet<>(YamlConfiguration.loadConfiguration(reader).getKeys(false));
@@ -125,7 +126,7 @@ public final class ConfigRepair {
             }
         } catch (IOException e) {
             plugin.getLogger().log(Level.WARNING, "Could not read bundled " + CONFIG_FILE + ".", e);
-            return Set.of();
+            return Collections.emptySet();
         }
     }
 

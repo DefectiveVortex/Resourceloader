@@ -141,7 +141,8 @@ public class MergeGUI implements Listener {
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
-        if (!(event.getWhoClicked() instanceof Player player)) return;
+        if (!(event.getWhoClicked() instanceof Player)) return;
+        Player player = (Player) event.getWhoClicked();
         Inventory mergeInventory = openInventories.get(player.getUniqueId());
         if (mergeInventory == null || !mergeInventory.equals(event.getInventory())) return;
 
@@ -214,7 +215,8 @@ public class MergeGUI implements Listener {
 
     @EventHandler
     public void onInventoryClose(InventoryCloseEvent event) {
-        if (!(event.getPlayer() instanceof Player player)) return;
+        if (!(event.getPlayer() instanceof Player)) return;
+        Player player = (Player) event.getPlayer();
         cleanup(player.getUniqueId());
     }
 

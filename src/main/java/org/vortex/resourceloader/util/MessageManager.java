@@ -24,7 +24,8 @@ public class MessageManager {
     private static final String DEFAULT_LANGUAGE = "en";
 
     // Bundled translations, stored under lang/messages_<code>.yml
-    public static final List<String> SUPPORTED_LANGUAGES = List.of("en", "ru", "tr", "ko", "zh");
+    public static final List<String> SUPPORTED_LANGUAGES =
+        Collections.unmodifiableList(Arrays.asList("en", "ru", "tr", "ko", "zh"));
 
     public MessageManager(Resourceloader plugin) {
         this.plugin = plugin;
@@ -75,7 +76,7 @@ public class MessageManager {
     }
 
     private String resolveLanguage(String configured) {
-        if (configured == null || configured.isBlank()) {
+        if (configured == null || configured.trim().isEmpty()) {
             return DEFAULT_LANGUAGE;
         }
 
@@ -157,7 +158,7 @@ public class MessageManager {
         }
 
         Matcher matcher = PLACEHOLDER_PATTERN.matcher(message);
-        StringBuilder result = new StringBuilder();
+        StringBuffer result = new StringBuffer();
         while (matcher.find()) {
             String value = placeholders.get(matcher.group(1));
             matcher.appendReplacement(result, Matcher.quoteReplacement(value != null ? value : matcher.group()));

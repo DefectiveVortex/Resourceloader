@@ -191,7 +191,13 @@ public class PackCompressor {
         }
 
         // Determine compression level based on player's ping and configured thresholds
-        int ping = player.getPing();
+        int ping;
+        try {
+            ping = player.getPing();
+        } catch (NoSuchMethodError e) {
+            // Player#getPing does not exist on older servers
+            return CompressionLevel.MEDIUM;
+        }
         int excellentThreshold = plugin.getConfig().getInt("compression.thresholds.excellent", 50);
         int goodThreshold = plugin.getConfig().getInt("compression.thresholds.good", 150);
         

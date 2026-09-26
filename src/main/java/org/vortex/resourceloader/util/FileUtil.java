@@ -17,7 +17,16 @@ public class FileUtil {
     private static final String TEMP_SUFFIX = ".tmp";
 
     // Packs are hashed on every send; only re-read a file when it changed
-    private record CachedHash(long size, long lastModified, byte[] hash) {
+    private static final class CachedHash {
+        final long size;
+        final long lastModified;
+        final byte[] hash;
+
+        CachedHash(long size, long lastModified, byte[] hash) {
+            this.size = size;
+            this.lastModified = lastModified;
+            this.hash = hash;
+        }
     }
 
     private static final Map<String, CachedHash> SHA1_CACHE = new ConcurrentHashMap<>();
@@ -31,8 +40,8 @@ public class FileUtil {
         long size = file.length();
         long lastModified = file.lastModified();
         CachedHash cached = SHA1_CACHE.get(key);
-        if (cached != null && cached.size() == size && cached.lastModified() == lastModified) {
-            return cached.hash().clone();
+        if (cached != null && cached.size == size && cached.lastModified == lastModified) {
+            return cached.hash.clone();
         }
 
         byte[] hash = computeSHA1(file);

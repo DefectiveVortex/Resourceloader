@@ -163,7 +163,7 @@ public class ResourcePackServer {
      * and the only symptom is every pack download failing.
      */
     private void warnIfUnreachable(String host) {
-        if (!plugin.getConfig().getString("server.address", "").isBlank()
+        if (!plugin.getConfig().getString("server.address", "").trim().isEmpty()
                 || plugin.getConfig().getBoolean("server.localhost", false)) {
             return;
         }
@@ -184,7 +184,7 @@ public class ResourcePackServer {
         String host = resolvePublicHost();
 
         int port = plugin.getConfig().getInt("server.port", 40021);
-        String encodedPath = URLEncoder.encode(packPath, StandardCharsets.UTF_8).replace("+", "%20");
+        String encodedPath = encode(packPath).replace("+", "%20");
 
         if (plugin.getConfig().getBoolean("enforcement.use-server-properties", false) &&
                 plugin.getConfig().getBoolean("enforcement.make-pack-public", false)) {
@@ -196,9 +196,17 @@ public class ResourcePackServer {
         return String.format("http://%s:%d/download/%s?token=%s", host, port, encodedPath, token);
     }
 
+    private static String encode(String value) {
+        try {
+            return URLEncoder.encode(value, "UTF-8");
+        } catch (java.io.UnsupportedEncodingException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     private String resolvePublicHost() {
         String configured = plugin.getConfig().getString("server.address", "");
-        if (!configured.isBlank()) {
+        if (!configured.trim().isEmpty()) {
             return configured;
         }
 
@@ -207,13 +215,13 @@ public class ResourcePackServer {
         }
 
         String serverIp = plugin.getServer().getIp();
-        if (serverIp != null && !serverIp.isBlank() && !"0.0.0.0".equals(serverIp)) {
+        if (serverIp != null && !serverIp.trim().isEmpty() && !"0.0.0.0".equals(serverIp)) {
             return serverIp;
         }
 
         try {
             String detected = InetAddress.getLocalHost().getHostAddress();
-            if (detected != null && !detected.isBlank()) {
+            if (detected != null && !detected.trim().isEmpty()) {
                 return detected;
             }
         } catch (IOException ignored) {

@@ -21,10 +21,11 @@ public class AutoLoadCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!(sender instanceof Player player)) {
+        if (!(sender instanceof Player)) {
             sender.sendMessage(plugin.getMessageManager().getMessage("general.players-only"));
             return true;
         }
+        Player player = (Player) sender;
 
         if (!player.hasPermission("resourceloader.autoload")) {
             sender.sendMessage(plugin.getMessageManager().getMessage("general.no-permission"));

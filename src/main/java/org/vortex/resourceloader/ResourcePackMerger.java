@@ -12,6 +12,7 @@ import java.util.concurrent.*;
 import java.nio.file.*;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -206,7 +207,7 @@ public class ResourcePackMerger {
 
         List<Path> files;
         try (Stream<Path> walk = Files.walk(sourceDir.toPath())) {
-            files = walk.filter(Files::isRegularFile).toList();
+            files = walk.filter(Files::isRegularFile).collect(Collectors.toList());
         }
 
         for (Path sourcePath : files) {
@@ -259,11 +260,13 @@ public class ResourcePackMerger {
             // sounds.json: events add their sounds to lower packs' events unless they set "replace"
             for (Map.Entry<String, Object> event : higher.entrySet()) {
                 Object existing = lower.get(event.getKey());
-                if (!(event.getValue() instanceof Map<?, ?> higherEvent) || !(existing instanceof Map<?, ?> lowerEvent)
-                        || Boolean.TRUE.equals(higherEvent.get("replace"))) {
+                if (!(event.getValue() instanceof Map) || !(existing instanceof Map)
+                        || Boolean.TRUE.equals(((Map<?, ?>) event.getValue()).get("replace"))) {
                     lower.put(event.getKey(), event.getValue());
                     continue;
                 }
+                Map<?, ?> higherEvent = (Map<?, ?>) event.getValue();
+                Map<?, ?> lowerEvent = (Map<?, ?>) existing;
                 Map<String, Object> combined = new LinkedHashMap<>((Map<String, Object>) lowerEvent);
                 combined.putAll((Map<String, Object>) higherEvent);
                 List<Object> sounds = new ArrayList<>(asList(lowerEvent.get("sounds")));
@@ -277,7 +280,7 @@ public class ResourcePackMerger {
     }
 
     private static List<?> asList(Object value) {
-        return value instanceof List<?> list ? list : List.of();
+        return value instanceof List ? (List<?>) value : Collections.emptyList();
     }
 
     /**
@@ -288,8 +291,8 @@ public class ResourcePackMerger {
     private void writePackMeta(File packDir, List<Map<String, Object>> metas) throws IOException {
         Map<String, Object> mcmeta = metas.isEmpty() ? new LinkedHashMap<>() : new LinkedHashMap<>(metas.get(metas.size() - 1));
 
-        Map<String, Object> pack = mcmeta.get("pack") instanceof Map<?, ?> p
-            ? new LinkedHashMap<>((Map<String, Object>) p) : new LinkedHashMap<>();
+        Map<String, Object> pack = mcmeta.get("pack") instanceof Map
+            ? new LinkedHashMap<>((Map<String, Object>) mcmeta.get("pack")) : new LinkedHashMap<>();
         mcmeta.put("pack", pack);
 
         PackFormats.Range range = null;
@@ -299,25 +302,25 @@ public class ResourcePackMerger {
         List<Object> filters = new ArrayList<>();
         for (Map<String, Object> meta : metas) {
             Object section = meta.get("pack");
-            if (section instanceof Map<?, ?> packSection) {
-                PackFormats.Range declared = PackFormats.readRange((Map<String, Object>) packSection);
+            if (section instanceof Map) {
+                PackFormats.Range declared = PackFormats.readRange((Map<String, Object>) section);
                 if (declared != null) {
                     range = range == null ? declared : range.span(declared);
                 }
             }
-            if (meta.get("overlays") instanceof Map<?, ?> o) {
-                for (Object entry : asList(o.get("entries"))) {
-                    Object dir = entry instanceof Map<?, ?> e ? e.get("directory") : entry;
+            if (meta.get("overlays") instanceof Map) {
+                for (Object entry : asList(((Map<?, ?>) meta.get("overlays")).get("entries"))) {
+                    Object dir = entry instanceof Map ? ((Map<?, ?>) entry).get("directory") : entry;
                     if (overlayDirs.add(dir)) {
                         overlays.add(entry);
                     }
                 }
             }
-            if (meta.get("language") instanceof Map<?, ?> l) {
-                languages.putAll((Map<String, Object>) l);
+            if (meta.get("language") instanceof Map) {
+                languages.putAll((Map<String, Object>) meta.get("language"));
             }
-            if (meta.get("filter") instanceof Map<?, ?> f) {
-                for (Object block : asList(f.get("block"))) {
+            if (meta.get("filter") instanceof Map) {
+                for (Object block : asList(((Map<?, ?>) meta.get("filter")).get("block"))) {
                     if (!filters.contains(block)) {
                         filters.add(block);
                     }
@@ -325,13 +328,13 @@ public class ResourcePackMerger {
             }
         }
         if (!overlays.isEmpty()) {
-            mcmeta.put("overlays", Map.of("entries", overlays));
+            mcmeta.put("overlays", Collections.singletonMap("entries", overlays));
         }
         if (!languages.isEmpty()) {
             mcmeta.put("language", languages);
         }
         if (!filters.isEmpty()) {
-            mcmeta.put("filter", Map.of("block", filters));
+            mcmeta.put("filter", Collections.singletonMap("block", filters));
         }
 
         PackFormats.Version server = PackFormats.currentResourceFormat();
@@ -343,7 +346,7 @@ public class ResourcePackMerger {
             range = new PackFormats.Range(new PackFormats.Version(34, 0), new PackFormats.Version(34, 0));
             logger.warning("Could not determine a pack format for the merged pack; defaulting to 34 (1.21)");
         }
-        PackFormats.writeRange(pack, range);
+        PackFormats.writeRange(pack, range, server);
         pack.put("description", "Merged Resource Pack");
 
         logger.info("Merged pack declares formats " + range + (server != null ? " (server uses " + server + ")" : ""));
@@ -378,7 +381,7 @@ public class ResourcePackMerger {
     private void zipDirectory(File sourceDir, File zipFile) throws IOException {
         List<Path> files;
         try (Stream<Path> walk = Files.walk(sourceDir.toPath())) {
-            files = walk.filter(path -> !Files.isDirectory(path)).sorted().toList();
+            files = walk.filter(path -> !Files.isDirectory(path)).sorted().collect(Collectors.toList());
         }
         try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(zipFile))) {
             for (Path path : files) {

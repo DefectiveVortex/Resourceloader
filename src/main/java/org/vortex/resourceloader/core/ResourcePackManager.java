@@ -4,6 +4,7 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.vortex.resourceloader.Resourceloader;
 import org.vortex.resourceloader.util.FileUtil;
+import org.vortex.resourceloader.util.ServerCompat;
 
 import java.io.File;
 import java.util.Map;
@@ -12,6 +13,7 @@ import java.util.logging.Logger;
 import java.util.UUID;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.AbstractMap;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
@@ -250,7 +252,7 @@ public class ResourcePackManager {
 
         source.thenApplyAsync(file -> {
             try {
-                return Map.entry(file, FileUtil.calcSHA1(file));
+                return new AbstractMap.SimpleImmutableEntry<>(file, FileUtil.calcSHA1(file));
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -268,12 +270,9 @@ public class ResourcePackManager {
                 UUID id = packId(packKey);
                 String url = packServer.createDownloadURL(player, packKey, remote ? packData.getKey().getName() : packPath);
                 logger.info("Sending resource pack '" + packKey + "' to " + player.getName());
-                if (plugin.getConfig().getBoolean("enforcement.use-server-properties", false)) {
-                    // Keep the pack the server sends from server.properties
-                    player.addResourcePack(id, url, packData.getValue(), null, force);
-                } else {
-                    player.setResourcePack(id, url, packData.getValue(), null, force);
-                }
+                // With use-server-properties, keep the pack the server sends from server.properties
+                ServerCompat.sendPack(player, id, url, packData.getValue(), force,
+                    plugin.getConfig().getBoolean("enforcement.use-server-properties", false));
                 result.complete(id);
             } catch (Exception e) {
                 result.completeExceptionally(e);

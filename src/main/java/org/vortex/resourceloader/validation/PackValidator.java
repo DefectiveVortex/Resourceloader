@@ -8,6 +8,7 @@ import org.vortex.resourceloader.util.PackFormats;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -99,12 +100,12 @@ public class PackValidator {
     private void validateMcMeta(ZipFile zip, ZipEntry entry) {
         try {
             Map<String, Object> mcmeta = mapper.readValue(zip.getInputStream(entry), Map.class);
-            if (!(mcmeta.get("pack") instanceof Map<?, ?> packSection)) {
+            if (!(mcmeta.get("pack") instanceof Map)) {
                 addIssue("pack.mcmeta is missing 'pack' section", true);
                 return;
             }
 
-            Map<String, Object> pack = (Map<String, Object>) packSection;
+            Map<String, Object> pack = (Map<String, Object>) mcmeta.get("pack");
             // The same checks the game runs; a pack failing them does not load at all
             for (String problem : PackFormats.findRejections(pack)) {
                 addIssue(problem, true);
@@ -170,18 +171,34 @@ public class PackValidator {
         issues.add(new ValidationIssue(message, critical));
     }
 
-    public record ValidationResult(boolean isValid, List<ValidationIssue> issues) {
+    public static final class ValidationResult {
+        private final boolean valid;
+        private final List<ValidationIssue> issues;
+
+        public ValidationResult(boolean valid, List<ValidationIssue> issues) {
+            this.valid = valid;
+            this.issues = issues;
+        }
+
+        public boolean isValid() {
+            return valid;
+        }
+
+        public List<ValidationIssue> issues() {
+            return issues;
+        }
+
         public List<String> getFormattedIssues() {
             List<String> formatted = new ArrayList<>();
             formatted.add("Validation Results:");
-
+            
             List<ValidationIssue> criticalIssues = issues.stream()
                 .filter(ValidationIssue::isCritical)
-                .toList();
-
+                .collect(Collectors.toList());
+            
             List<ValidationIssue> warnings = issues.stream()
                 .filter(i -> !i.isCritical())
-                .toList();
+                .collect(Collectors.toList());
 
             if (!criticalIssues.isEmpty()) {
                 formatted.add("Critical Issues:");
@@ -201,5 +218,21 @@ public class PackValidator {
         }
     }
 
-    public record ValidationIssue(String message, boolean isCritical) {}
+    public static final class ValidationIssue {
+        private final String message;
+        private final boolean critical;
+
+        public ValidationIssue(String message, boolean critical) {
+            this.message = message;
+            this.critical = critical;
+        }
+
+        public String message() {
+            return message;
+        }
+
+        public boolean isCritical() {
+            return critical;
+        }
+    }
 }

@@ -291,8 +291,15 @@ enforcement:
 
 ## Requirements
 
-- Minecraft 1.13 or newer
-- Java 17 or newer
+- Minecraft 1.13 to 26.3 on Paper, Purpur or Spigot
+- Java 8 or newer (whatever your server version already needs)
+
+Tested on Paper 1.13.2, 1.14.4, 1.15.2, 1.16.5, 1.17.1, 1.18.2, 1.19.4, 1.20.2, 1.20.4, 1.20.6, 1.21.4, 1.21.11 and 26.3.
+A few things depend on what the server version supports:
+- The pack is shown as *required* in the prompt (enforcement with `kick-on-decline`) on 1.18 and newer.
+- Before 1.20.3 a player holds one server pack at a time, so a pack sent later (for example by `/autoload`
+  with `use-server-properties`) replaces the previous one instead of being added on top.
+- Merged packs declare the pack format of the server they were made on, so they show as compatible for its players.
 
 ## Support
 
